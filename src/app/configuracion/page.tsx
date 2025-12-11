@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
 import { supabase } from "@/lib/supabase";
@@ -6,41 +6,44 @@ import { canAccessConfig, isSuperAdmin, ROLES } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-interface UserWithOrg {
+interface UserDisplay {
   id: string;
   email: string;
   full_name: string | null;
-  avatar_url: string | null;
+  image_url: string | null;
   role: string | null;
-  organization_id: string | null;
   created_at: string;
 }
 
-async function getUsers(): Promise<UserWithOrg[]> {
-  // Traer usuarios con su rol en la organización
-  const { data: users } = await supabase
-    .from("users")
-    .select("*")
-    .order("created_at", { ascending: false });
+async function getOrganizationUsers(): Promise<UserDisplay[]> {
+  try {
+    // Intentar traer usuarios desde Clerk
+    const client = await clerkClient();
+    const clerkUsers = await client.users.getUserList({ limit: 100 });
+    
+    // Traer roles desde Supabase
+    const userIds = clerkUsers.data.map(u => u.id);
+    const { data: orgRoles } = await supabase
+      .from("user_organizations")
+      .select("user_id, role")
+      .in("user_id", userIds);
 
-  if (!users) return [];
-
-  // Traer roles de cada usuario
-  const userIds = users.map((u: { id: string }) => u.id);
-  const { data: orgs } = await supabase
-    .from("user_organizations")
-    .select("*")
-    .in("user_id", userIds);
-
-  // Combinar datos
-  return users.map((user: { id: string; email: string; full_name: string | null; avatar_url: string | null; created_at: string }) => {
-    const org = orgs?.find((o: { user_id: string }) => o.user_id === user.id);
-    return {
-      ...user,
-      role: org?.role || null,
-      organization_id: org?.organization_id || null,
-    };
-  });
+    // Combinar datos
+    return clerkUsers.data.map(u => {
+      const orgRole = orgRoles?.find(o => o.user_id === u.id);
+      return {
+        id: u.id,
+        email: u.emailAddresses[0]?.emailAddress || "",
+        full_name: u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.firstName || null,
+        image_url: u.imageUrl,
+        role: orgRole?.role || null,
+        created_at: new Date(u.createdAt).toISOString(),
+      };
+    });
+  } catch {
+    // Si falla, devolver array vacío
+    return [];
+  }
 }
 
 function getRoleBadgeVariant(role: string | null): "default" | "success" | "warning" | "error" | "info" {
@@ -61,6 +64,17 @@ function getRoleBadgeVariant(role: string | null): "default" | "success" | "warn
   }
 }
 
+function getInitials(name: string | null, email: string): string {
+  if (name) {
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return name[0]?.toUpperCase() || "?";
+  }
+  return email?.[0]?.toUpperCase() || "?";
+}
+
 export default async function ConfiguracionPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
@@ -68,22 +82,26 @@ export default async function ConfiguracionPage() {
   const user = await currentUser();
   const userEmail = user?.emailAddresses[0]?.emailAddress;
 
-  // Verificar permisos - traer rol del usuario actual
-  const { data: currentUserOrg } = await supabase
-    .from("user_organizations")
-    .select("role")
-    .eq("user_id", userId)
-    .single();
+  // Para super admins, siempre permitir acceso
+  const isSuper = isSuperAdmin(userEmail);
+  
+  if (!isSuper) {
+    // Verificar permisos desde Supabase
+    const { data: currentUserOrg } = await supabase
+      .from("user_organizations")
+      .select("role")
+      .eq("user_id", userId)
+      .single();
 
-  const currentRole = currentUserOrg?.role;
+    const currentRole = currentUserOrg?.role;
 
-  // Solo admins y super admins pueden acceder
-  if (!canAccessConfig(currentRole, userEmail)) {
-    redirect("/");
+    // Solo admins y super admins pueden acceder
+    if (!canAccessConfig(currentRole, userEmail)) {
+      redirect("/");
+    }
   }
 
-  const users = await getUsers();
-  const isSuper = isSuperAdmin(userEmail);
+  const users = await getOrganizationUsers();
 
   return (
     <div className="min-h-screen bg-white">
@@ -138,22 +156,32 @@ export default async function ConfiguracionPage() {
                       <tr key={u.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-neutral-600">
-                              {u.full_name?.[0]?.toUpperCase() || u.email[0].toUpperCase()}
-                            </div>
+                            {u.image_url ? (
+                              <img 
+                                src={u.image_url} 
+                                alt={u.full_name || u.email}
+                                className="w-7 h-7 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-neutral-600">
+                                {getInitials(u.full_name, u.email)}
+                              </div>
+                            )}
                             <span className="font-medium text-neutral-900">
-                              {u.full_name || "Sin nombre"}
+                              {u.full_name || u.email?.split("@")[0] || "Sin nombre"}
                             </span>
                           </div>
                         </td>
                         <td className="px-3 py-2 text-neutral-600">
-                          {u.email}
+                          {u.email || "-"}
                           {isSuperAdmin(u.email) && (
                             <span className="ml-1.5 text-orange-500 text-xs">★</span>
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          {u.role ? (
+                          {isSuperAdmin(u.email) ? (
+                            <Badge variant="success">Super Admin</Badge>
+                          ) : u.role ? (
                             <Badge variant={getRoleBadgeVariant(u.role)}>
                               {ROLES[u.role as keyof typeof ROLES] || u.role}
                             </Badge>
@@ -162,15 +190,16 @@ export default async function ConfiguracionPage() {
                           )}
                         </td>
                         <td className="px-3 py-2 text-neutral-400 text-xs">
-                          {new Date(u.created_at).toLocaleDateString("es-AR")}
+                          {u.created_at ? new Date(u.created_at).toLocaleDateString("es-AR") : "-"}
                         </td>
                         <td className="px-3 py-2">
-                          <button 
-                            className="text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
-                            disabled={isSuperAdmin(u.email) && !isSuper}
-                          >
-                            Editar rol
-                          </button>
+                          {!isSuperAdmin(u.email) && (
+                            <button 
+                              className="text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
+                            >
+                              Editar rol
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -240,7 +269,6 @@ export default async function ConfiguracionPage() {
             <p className="text-xs text-neutral-500">
               <span className="text-orange-500">★</span> indica Super Admin (acceso total).
               Los permisos se aplican automáticamente según el rol asignado.
-              Para cambiar el rol de un usuario, contactá a un administrador.
             </p>
           </div>
         </div>
