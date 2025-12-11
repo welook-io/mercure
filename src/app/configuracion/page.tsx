@@ -13,57 +13,45 @@ interface UserDisplay {
   full_name: string | null;
   image_url: string | null;
   role: string | null;
-  org_role: string | null; // Rol en la organización de Clerk
   created_at: string;
   is_kalia: boolean;
 }
 
-async function getOrganizationUsers(): Promise<UserDisplay[]> {
+// Obtener usuarios de la organización Mercure (solo los que tienen rol asignado o son @kalia.app)
+async function getMercureUsers(): Promise<UserDisplay[]> {
   try {
     const client = await clerkClient();
+    
+    // 1. Traer roles desde Supabase primero
+    const { data: orgRoles } = await supabase
+      .from("user_organizations")
+      .select("user_id, role");
+
+    const usersWithRoles = new Set(orgRoles?.map(o => o.user_id) || []);
+
+    // 2. Traer todos los usuarios de Clerk
+    const clerkUsers = await client.users.getUserList({ limit: 100 });
     const users: UserDisplay[] = [];
-    const seenEmails = new Set<string>();
 
-    // 1. Traer todos los usuarios de Clerk
-    try {
-      const clerkUsers = await client.users.getUserList({ limit: 100 });
+    for (const u of clerkUsers.data) {
+      const email = u.emailAddresses[0]?.emailAddress || "";
+      const isKalia = email.toLowerCase().endsWith(`@${SUPER_ADMIN_DOMAIN}`);
+      const hasRole = usersWithRoles.has(u.id);
 
-      for (const u of clerkUsers.data) {
-        const email = u.emailAddresses[0]?.emailAddress || "";
-        if (email && !seenEmails.has(email.toLowerCase())) {
-          seenEmails.add(email.toLowerCase());
-          users.push({
-            id: u.id,
-            email: email,
-            full_name: u.firstName && u.lastName 
-              ? `${u.firstName} ${u.lastName}` 
-              : u.firstName || null,
-            image_url: u.imageUrl,
-            role: null,
-            org_role: null,
-            created_at: new Date(u.createdAt).toISOString(),
-            is_kalia: email.toLowerCase().endsWith(`@${SUPER_ADMIN_DOMAIN}`),
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Error fetching users:", e);
-    }
-
-    // 2. Traer roles desde Supabase
-    if (users.length > 0) {
-      const userIds = users.map(u => u.id);
-      const { data: orgRoles } = await supabase
-        .from("user_organizations")
-        .select("user_id, role")
-        .in("user_id", userIds);
-
-      // Asignar roles de Supabase
-      for (const user of users) {
-        const orgRole = orgRoles?.find(o => o.user_id === user.id);
-        if (orgRole) {
-          user.role = orgRole.role;
-        }
+      // Solo incluir si es @kalia.app O tiene rol asignado
+      if (isKalia || hasRole) {
+        const orgRole = orgRoles?.find(o => o.user_id === u.id);
+        users.push({
+          id: u.id,
+          email: email,
+          full_name: u.firstName && u.lastName 
+            ? `${u.firstName} ${u.lastName}` 
+            : u.firstName || null,
+          image_url: u.imageUrl,
+          role: orgRole?.role || null,
+          created_at: new Date(u.createdAt).toISOString(),
+          is_kalia: isKalia,
+        });
       }
     }
 
@@ -75,7 +63,54 @@ async function getOrganizationUsers(): Promise<UserDisplay[]> {
     });
 
   } catch (e) {
-    console.error("Error in getOrganizationUsers:", e);
+    console.error("Error in getMercureUsers:", e);
+    return [];
+  }
+}
+
+// Obtener TODOS los usuarios de la plataforma (para Super Admins)
+async function getAllUsers(): Promise<UserDisplay[]> {
+  try {
+    const client = await clerkClient();
+    const clerkUsers = await client.users.getUserList({ limit: 100 });
+    
+    // Traer roles desde Supabase
+    const userIds = clerkUsers.data.map(u => u.id);
+    const { data: orgRoles } = await supabase
+      .from("user_organizations")
+      .select("user_id, role")
+      .in("user_id", userIds);
+
+    const users: UserDisplay[] = clerkUsers.data.map(u => {
+      const email = u.emailAddresses[0]?.emailAddress || "";
+      const orgRole = orgRoles?.find(o => o.user_id === u.id);
+      return {
+        id: u.id,
+        email: email,
+        full_name: u.firstName && u.lastName 
+          ? `${u.firstName} ${u.lastName}` 
+          : u.firstName || null,
+        image_url: u.imageUrl,
+        role: orgRole?.role || null,
+        created_at: new Date(u.createdAt).toISOString(),
+        is_kalia: email.toLowerCase().endsWith(`@${SUPER_ADMIN_DOMAIN}`),
+      };
+    });
+
+    // Ordenar: primero sin rol, luego con rol, luego @kalia.app al final
+    return users.sort((a, b) => {
+      // @kalia.app siempre al principio
+      if (a.is_kalia && !b.is_kalia) return -1;
+      if (!a.is_kalia && b.is_kalia) return 1;
+      // Luego los que no tienen rol
+      if (!a.role && b.role) return -1;
+      if (a.role && !b.role) return 1;
+      // Luego alfabéticamente
+      return (a.full_name || a.email).localeCompare(b.full_name || b.email);
+    });
+
+  } catch (e) {
+    console.error("Error in getAllUsers:", e);
     return [];
   }
 }
@@ -135,7 +170,11 @@ export default async function ConfiguracionPage() {
     }
   }
 
-  const users = await getOrganizationUsers();
+  // Traer usuarios de Mercure (solo los que tienen rol o son @kalia.app)
+  const mercureUsers = await getMercureUsers();
+  
+  // Para super admins, traer TODOS los usuarios
+  const allUsers = isSuper ? await getAllUsers() : [];
 
   return (
     <div className="min-h-screen bg-white">
@@ -145,26 +184,19 @@ export default async function ConfiguracionPage() {
           <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
             <div>
               <h1 className="text-lg font-medium text-neutral-900">Configuración</h1>
-              <p className="text-sm text-neutral-500 mt-0.5">Gestión de usuarios y permisos</p>
+              <p className="text-sm text-neutral-500 mt-0.5">Gestión de usuarios y permisos de Mercure</p>
             </div>
             {isSuper && (
               <Badge variant="success" className="text-xs">Super Admin</Badge>
             )}
           </div>
 
-          {/* Usuarios */}
+          {/* Usuarios de Mercure */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
-                Usuarios ({users.length})
+                Equipo Mercure ({mercureUsers.length})
               </h2>
-              <Button 
-                variant="outline" 
-                className="h-8 px-3 text-sm border-neutral-200 hover:bg-neutral-50"
-                disabled
-              >
-                + Invitar usuario
-              </Button>
             </div>
 
             <div className="border border-neutral-200 rounded overflow-hidden">
@@ -173,20 +205,19 @@ export default async function ConfiguracionPage() {
                   <tr className="bg-neutral-50 border-b border-neutral-200">
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Usuario</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Email</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Rol</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Rol en Mercure</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Desde</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.length === 0 ? (
+                  {mercureUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-3 py-8 text-center text-neutral-400">
-                        No hay usuarios registrados
+                      <td colSpan={4} className="px-3 py-8 text-center text-neutral-400">
+                        No hay usuarios en el equipo de Mercure
                       </td>
                     </tr>
                   ) : (
-                    users.map((u) => (
+                    mercureUsers.map((u) => (
                       <tr key={u.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
@@ -208,38 +239,23 @@ export default async function ConfiguracionPage() {
                         </td>
                         <td className="px-3 py-2 text-neutral-600">
                           {u.email || "-"}
-                          {isSuperAdmin(u.email) && (
+                          {u.is_kalia && (
                             <span className="ml-1.5 text-orange-500 text-xs">★</span>
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            {u.is_kalia ? (
-                              <Badge variant="success">Super Admin</Badge>
-                            ) : u.role ? (
-                              <Badge variant={getRoleBadgeVariant(u.role)}>
-                                {ROLES[u.role as keyof typeof ROLES] || u.role}
-                              </Badge>
-                            ) : u.org_role ? (
-                              <Badge variant="default">
-                                {u.org_role === "org:admin" ? "Admin Org" : "Miembro"}
-                              </Badge>
-                            ) : (
-                              <span className="text-neutral-400 text-xs">Sin rol</span>
-                            )}
-                          </div>
+                          {u.is_kalia ? (
+                            <Badge variant="success">Super Admin</Badge>
+                          ) : u.role ? (
+                            <Badge variant={getRoleBadgeVariant(u.role)}>
+                              {ROLES[u.role as keyof typeof ROLES] || u.role}
+                            </Badge>
+                          ) : (
+                            <span className="text-neutral-400 text-xs">-</span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-neutral-400 text-xs">
                           {u.created_at ? new Date(u.created_at).toLocaleDateString("es-AR") : "-"}
-                        </td>
-                        <td className="px-3 py-2">
-                          {!isSuperAdmin(u.email) && (
-                            <button 
-                              className="text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
-                            >
-                              Editar rol
-                            </button>
-                          )}
                         </td>
                       </tr>
                     ))
@@ -324,12 +340,12 @@ export default async function ConfiguracionPage() {
               </div>
               
               <p className="text-xs text-neutral-500 mb-4">
-                Desde aquí podés asignar roles a cualquier usuario de la organización.
-                Los cambios se aplican inmediatamente.
+                Desde aquí podés asignar roles a cualquier usuario de la plataforma.
+                Los usuarios sin rol asignado no aparecen en el equipo de Mercure.
               </p>
 
               <RoleForm 
-                users={users.map(u => ({
+                users={allUsers.map(u => ({
                   id: u.id,
                   email: u.email,
                   full_name: u.full_name,
