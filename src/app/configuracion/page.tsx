@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { canAccessConfig, isSuperAdmin, ROLES, SUPER_ADMIN_DOMAIN } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RoleForm } from "./role-form";
 
 interface UserDisplay {
   id: string;
@@ -351,6 +352,35 @@ export default async function ConfiguracionPage() {
               Los permisos se aplican automáticamente según el rol asignado.
             </p>
           </div>
+
+          {/* Sección exclusiva para Super Admins */}
+          {isSuper && (
+            <div className="mt-8 pt-6 border-t border-orange-200">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-orange-500 text-lg">★</span>
+                <h2 className="text-sm font-medium text-neutral-900">
+                  Panel Super Admin
+                </h2>
+                <Badge variant="warning" className="text-xs">Solo @kalia.app</Badge>
+              </div>
+              
+              <p className="text-xs text-neutral-500 mb-4">
+                Desde aquí podés asignar roles a cualquier usuario de la organización.
+                Los cambios se aplican inmediatamente.
+              </p>
+
+              <RoleForm 
+                users={users.map(u => ({
+                  id: u.id,
+                  email: u.email,
+                  full_name: u.full_name,
+                  image_url: u.image_url,
+                  role: u.role,
+                  is_kalia: u.is_kalia,
+                }))} 
+              />
+            </div>
+          )}
         </div>
       </main>
     </div>
