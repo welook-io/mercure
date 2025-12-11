@@ -3,6 +3,7 @@
 // Super admins (acceso total a todo)
 export const SUPER_ADMINS = [
   "angelo@kalia.app",
+  "uguareschi@gmail.com",
 ];
 
 // Dominio de super admins (todos los @kalia.app son super admins)

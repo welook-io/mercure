@@ -10,14 +10,14 @@ export default async function SolicitarAccesoPage() {
     redirect("/sign-in");
   }
 
-  // Si ya tiene acceso, redirigir al dashboard
-  const userHasAccess = await hasAccess(userId);
+  const user = await currentUser();
+  const email = user?.primaryEmailAddress?.emailAddress || "";
+
+  // Si ya tiene acceso (incluyendo super admins), redirigir al dashboard
+  const userHasAccess = await hasAccess(userId, email);
   if (userHasAccess) {
     redirect("/");
   }
-
-  const user = await currentUser();
-  const email = user?.primaryEmailAddress?.emailAddress || "";
 
   return <SolicitarAccesoClient email={email} />;
 }

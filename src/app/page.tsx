@@ -51,13 +51,14 @@ export default async function Home() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  // Verificar si tiene acceso (rol asignado)
-  const userHasAccess = await hasAccess(userId);
+  const user = await currentUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+
+  // Verificar si tiene acceso (rol asignado o super admin)
+  const userHasAccess = await hasAccess(userId, userEmail);
   if (!userHasAccess) {
     redirect("/solicitar-acceso");
   }
-
-  const user = await currentUser();
   const [activeTrips, pendingShipments, recentDeliveries] = await Promise.all([
     getActiveTrips(),
     getPendingShipments(),
