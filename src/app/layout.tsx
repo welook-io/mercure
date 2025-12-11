@@ -15,7 +15,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Mercure",
-  description: "Mercure App",
+  description: "Sistema de gestión logística",
+  icons: {
+    icon: "/kalia_logos/kalia_isologo_black.svg",
+  },
 };
 
 function ConditionalClerkProvider({ children }: { children: React.ReactNode }) {
