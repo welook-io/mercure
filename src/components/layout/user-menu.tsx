@@ -10,8 +10,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { useUserProfile, ROLE_LABELS } from "@/lib/hooks/use-user-profile";
+import { canAccessConfig, isSuperAdmin } from "@/lib/permissions";
 
 export function UserMenu() {
   const { user } = useUser();
@@ -27,9 +28,14 @@ export function UserMenu() {
 
   const userEmail = user.emailAddresses[0]?.emailAddress;
   const displayName = user.fullName || userEmail?.split("@")[0] || "Usuario";
-  const roleLabel = organization?.role 
-    ? ROLE_LABELS[organization.role] || organization.role 
+  const userRole = organization?.role;
+  const roleLabel = userRole 
+    ? ROLE_LABELS[userRole] || userRole 
     : null;
+  
+  // Verificar si puede acceder a configuración
+  const showConfig = canAccessConfig(userRole, userEmail);
+  const isSuper = isSuperAdmin(userEmail);
 
   return (
     <DropdownMenu>
@@ -50,9 +56,9 @@ export function UserMenu() {
                 {initials}
               </AvatarFallback>
             </Avatar>
-            {roleLabel && (
-              <span className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none">
-                {roleLabel.slice(0, 3).toUpperCase()}
+            {(roleLabel || isSuper) && (
+              <span className={`absolute -bottom-1 -right-1 text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none ${isSuper ? 'bg-orange-500' : 'bg-neutral-600'}`}>
+                {isSuper ? '★' : roleLabel?.slice(0, 3).toUpperCase()}
               </span>
             )}
           </div>
@@ -67,14 +73,32 @@ export function UserMenu() {
           <p className="text-xs text-neutral-500 truncate">
             {userEmail}
           </p>
-          {roleLabel && (
-            <p className="text-xs text-orange-600 font-medium mt-1">
+          {isSuper ? (
+            <p className="text-xs text-orange-500 font-medium mt-1">
+              ★ Super Admin
+            </p>
+          ) : roleLabel ? (
+            <p className="text-xs text-neutral-600 font-medium mt-1">
               {roleLabel}
             </p>
-          )}
+          ) : null}
         </div>
         
         <DropdownMenuSeparator />
+        
+        {showConfig && (
+          <>
+            <DropdownMenuItem 
+              className="cursor-pointer"
+              onClick={() => router.push("/configuracion")}
+            >
+              <Settings className="mr-2 h-4 w-4 text-neutral-500" />
+              <span>Configuración</span>
+            </DropdownMenuItem>
+            
+            <DropdownMenuSeparator />
+          </>
+        )}
         
         <DropdownMenuItem 
           className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
