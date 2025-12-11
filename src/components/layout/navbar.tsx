@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
+import { UserMenu } from "./user-menu";
 
 export function Navbar() {
   return (
@@ -18,14 +18,7 @@ export function Navbar() {
       </Link>
       
       <div className="flex items-center gap-4">
-        <UserButton 
-          afterSignOutUrl="/sign-in"
-          appearance={{
-            elements: {
-              avatarBox: "w-8 h-8"
-            }
-          }}
-        />
+        <UserMenu />
       </div>
     </nav>
   );
