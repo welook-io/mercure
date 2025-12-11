@@ -24,74 +24,33 @@ async function getOrganizationUsers(): Promise<UserDisplay[]> {
     const users: UserDisplay[] = [];
     const seenEmails = new Set<string>();
 
-    // 1. Traer miembros de la organización Mercure desde Clerk
+    // 1. Traer todos los usuarios de Clerk
     try {
-      const orgs = await client.organizations.getOrganizationList({ limit: 100 });
-      const mercureOrg = orgs.data.find(o => 
-        o.name.toLowerCase().includes("mercure") || 
-        o.slug?.toLowerCase().includes("mercure")
-      );
+      const clerkUsers = await client.users.getUserList({ limit: 100 });
 
-      if (mercureOrg) {
-        const members = await client.organizations.getOrganizationMembershipList({
-          organizationId: mercureOrg.id,
-          limit: 100,
-        });
-
-        for (const member of members.data) {
-          const userData = member.publicUserData;
-          if (userData) {
-            const email = userData.identifier || "";
-            if (email && !seenEmails.has(email.toLowerCase())) {
-              seenEmails.add(email.toLowerCase());
-              users.push({
-                id: userData.userId || member.id,
-                email: email,
-                full_name: userData.firstName && userData.lastName 
-                  ? `${userData.firstName} ${userData.lastName}` 
-                  : userData.firstName || null,
-                image_url: userData.imageUrl || null,
-                role: null,
-                org_role: member.role,
-                created_at: new Date(member.createdAt).toISOString(),
-                is_kalia: email.toLowerCase().endsWith(`@${SUPER_ADMIN_DOMAIN}`),
-              });
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Error fetching org members:", e);
-    }
-
-    // 2. Agregar usuarios @kalia.app que no estén ya en la lista
-    try {
-      const kaliaUsers = await client.users.getUserList({ 
-        limit: 100,
-        emailAddress: [`*@${SUPER_ADMIN_DOMAIN}`],
-      });
-
-      for (const u of kaliaUsers.data) {
+      for (const u of clerkUsers.data) {
         const email = u.emailAddresses[0]?.emailAddress || "";
         if (email && !seenEmails.has(email.toLowerCase())) {
           seenEmails.add(email.toLowerCase());
           users.push({
             id: u.id,
             email: email,
-            full_name: u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.firstName || null,
+            full_name: u.firstName && u.lastName 
+              ? `${u.firstName} ${u.lastName}` 
+              : u.firstName || null,
             image_url: u.imageUrl,
             role: null,
             org_role: null,
             created_at: new Date(u.createdAt).toISOString(),
-            is_kalia: true,
+            is_kalia: email.toLowerCase().endsWith(`@${SUPER_ADMIN_DOMAIN}`),
           });
         }
       }
     } catch (e) {
-      console.error("Error fetching kalia users:", e);
+      console.error("Error fetching users:", e);
     }
 
-    // 3. Traer roles desde Supabase
+    // 2. Traer roles desde Supabase
     if (users.length > 0) {
       const userIds = users.map(u => u.id);
       const { data: orgRoles } = await supabase
