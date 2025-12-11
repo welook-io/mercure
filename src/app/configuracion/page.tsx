@@ -2,7 +2,7 @@ import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
 import { supabase } from "@/lib/supabase";
-import { canAccessConfig, isSuperAdmin, ROLES } from "@/lib/permissions";
+import { canAccessConfig, isSuperAdmin, ROLES, SUPER_ADMIN_DOMAIN } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -12,36 +12,110 @@ interface UserDisplay {
   full_name: string | null;
   image_url: string | null;
   role: string | null;
+  org_role: string | null; // Rol en la organización de Clerk
   created_at: string;
+  is_kalia: boolean;
 }
 
 async function getOrganizationUsers(): Promise<UserDisplay[]> {
   try {
-    // Intentar traer usuarios desde Clerk
     const client = await clerkClient();
-    const clerkUsers = await client.users.getUserList({ limit: 100 });
-    
-    // Traer roles desde Supabase
-    const userIds = clerkUsers.data.map(u => u.id);
-    const { data: orgRoles } = await supabase
-      .from("user_organizations")
-      .select("user_id, role")
-      .in("user_id", userIds);
+    const users: UserDisplay[] = [];
+    const seenEmails = new Set<string>();
 
-    // Combinar datos
-    return clerkUsers.data.map(u => {
-      const orgRole = orgRoles?.find(o => o.user_id === u.id);
-      return {
-        id: u.id,
-        email: u.emailAddresses[0]?.emailAddress || "",
-        full_name: u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.firstName || null,
-        image_url: u.imageUrl,
-        role: orgRole?.role || null,
-        created_at: new Date(u.createdAt).toISOString(),
-      };
+    // 1. Traer miembros de la organización Mercure desde Clerk
+    try {
+      const orgs = await client.organizations.getOrganizationList({ limit: 100 });
+      const mercureOrg = orgs.data.find(o => 
+        o.name.toLowerCase().includes("mercure") || 
+        o.slug?.toLowerCase().includes("mercure")
+      );
+
+      if (mercureOrg) {
+        const members = await client.organizations.getOrganizationMembershipList({
+          organizationId: mercureOrg.id,
+          limit: 100,
+        });
+
+        for (const member of members.data) {
+          const userData = member.publicUserData;
+          if (userData) {
+            const email = userData.identifier || "";
+            if (email && !seenEmails.has(email.toLowerCase())) {
+              seenEmails.add(email.toLowerCase());
+              users.push({
+                id: userData.userId || member.id,
+                email: email,
+                full_name: userData.firstName && userData.lastName 
+                  ? `${userData.firstName} ${userData.lastName}` 
+                  : userData.firstName || null,
+                image_url: userData.imageUrl || null,
+                role: null,
+                org_role: member.role,
+                created_at: new Date(member.createdAt).toISOString(),
+                is_kalia: email.toLowerCase().endsWith(`@${SUPER_ADMIN_DOMAIN}`),
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching org members:", e);
+    }
+
+    // 2. Agregar usuarios @kalia.app que no estén ya en la lista
+    try {
+      const kaliaUsers = await client.users.getUserList({ 
+        limit: 100,
+        emailAddress: [`*@${SUPER_ADMIN_DOMAIN}`],
+      });
+
+      for (const u of kaliaUsers.data) {
+        const email = u.emailAddresses[0]?.emailAddress || "";
+        if (email && !seenEmails.has(email.toLowerCase())) {
+          seenEmails.add(email.toLowerCase());
+          users.push({
+            id: u.id,
+            email: email,
+            full_name: u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.firstName || null,
+            image_url: u.imageUrl,
+            role: null,
+            org_role: null,
+            created_at: new Date(u.createdAt).toISOString(),
+            is_kalia: true,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching kalia users:", e);
+    }
+
+    // 3. Traer roles desde Supabase
+    if (users.length > 0) {
+      const userIds = users.map(u => u.id);
+      const { data: orgRoles } = await supabase
+        .from("user_organizations")
+        .select("user_id, role")
+        .in("user_id", userIds);
+
+      // Asignar roles de Supabase
+      for (const user of users) {
+        const orgRole = orgRoles?.find(o => o.user_id === user.id);
+        if (orgRole) {
+          user.role = orgRole.role;
+        }
+      }
+    }
+
+    // Ordenar: primero @kalia.app, luego por nombre
+    return users.sort((a, b) => {
+      if (a.is_kalia && !b.is_kalia) return -1;
+      if (!a.is_kalia && b.is_kalia) return 1;
+      return (a.full_name || a.email).localeCompare(b.full_name || b.email);
     });
-  } catch {
-    // Si falla, devolver array vacío
+
+  } catch (e) {
+    console.error("Error in getOrganizationUsers:", e);
     return [];
   }
 }
@@ -179,15 +253,21 @@ export default async function ConfiguracionPage() {
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          {isSuperAdmin(u.email) ? (
-                            <Badge variant="success">Super Admin</Badge>
-                          ) : u.role ? (
-                            <Badge variant={getRoleBadgeVariant(u.role)}>
-                              {ROLES[u.role as keyof typeof ROLES] || u.role}
-                            </Badge>
-                          ) : (
-                            <span className="text-neutral-400 text-xs">Sin rol</span>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {u.is_kalia ? (
+                              <Badge variant="success">Super Admin</Badge>
+                            ) : u.role ? (
+                              <Badge variant={getRoleBadgeVariant(u.role)}>
+                                {ROLES[u.role as keyof typeof ROLES] || u.role}
+                              </Badge>
+                            ) : u.org_role ? (
+                              <Badge variant="default">
+                                {u.org_role === "org:admin" ? "Admin Org" : "Miembro"}
+                              </Badge>
+                            ) : (
+                              <span className="text-neutral-400 text-xs">Sin rol</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-neutral-400 text-xs">
                           {u.created_at ? new Date(u.created_at).toLocaleDateString("es-AR") : "-"}

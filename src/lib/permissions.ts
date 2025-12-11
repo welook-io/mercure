@@ -5,6 +5,18 @@ export const SUPER_ADMINS = [
   "angelo@kalia.app",
 ];
 
+// Dominio de super admins (todos los @kalia.app son super admins)
+export const SUPER_ADMIN_DOMAIN = "kalia.app";
+
+// ID de la organización Mercure en Clerk (actualizar con el ID real)
+export const MERCURE_ORG_ID = process.env.NEXT_PUBLIC_CLERK_MERCURE_ORG_ID || "";
+
+// Verificar si un email es del dominio super admin
+export function isSuperAdminDomain(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return email.toLowerCase().endsWith(`@${SUPER_ADMIN_DOMAIN}`);
+}
+
 // Roles disponibles en la organización
 export const ROLES = {
   super_admin: "Super Admin",
@@ -54,7 +66,9 @@ export type Permission = keyof typeof PERMISSIONS;
 // Verificar si un email es super admin
 export function isSuperAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
-  return SUPER_ADMINS.includes(email.toLowerCase());
+  const emailLower = email.toLowerCase();
+  // Es super admin si está en la lista O si es del dominio @kalia.app
+  return SUPER_ADMINS.includes(emailLower) || isSuperAdminDomain(emailLower);
 }
 
 // Verificar si un rol tiene permiso para un módulo
