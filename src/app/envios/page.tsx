@@ -1,8 +1,9 @@
 import { Navbar } from "@/components/layout/navbar";
 import { supabase } from "@/lib/supabase";
 import { requireAuth } from "@/lib/auth";
-import { Truck } from "lucide-react";
+import { Truck, Plus } from "lucide-react";
 import { ShipmentTransitList } from "./shipment-transit-list";
+import Link from "next/link";
 
 interface Shipment {
   id: number;
@@ -90,6 +91,13 @@ export default async function EnviosPage() {
                 <p className="text-xs text-neutral-500">{shipments.length} envío{shipments.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
+            <Link 
+              href="/envios/nuevo"
+              className="h-8 px-3 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Cargar Remito Manual
+            </Link>
           </div>
 
           <ShipmentTransitList groups={groups} sinViaje={sinViaje} />
