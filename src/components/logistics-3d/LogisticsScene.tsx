@@ -19,7 +19,7 @@ interface TripData {
   id: number;
   origin: string;
   destination: string;
-  status: string;
+  status: string; // loading, in_transit, arrived
   vehiclePlate: string | null;
   shipments: ShipmentData[];
   progress: number;
@@ -42,7 +42,7 @@ interface LogisticsSceneProps {
   onSelectShipments: (shipments: ShipmentData[], title: string) => void;
 }
 
-// Depósito 3D simple
+// Depósito 3D
 function Warehouse3D({
   position,
   name,
@@ -110,7 +110,7 @@ function Warehouse3D({
   );
 }
 
-// Camión 3D simple (sin animaciones)
+// Camión grande (larga distancia)
 function Truck3D({
   position,
   rotation = [0, 0, 0],
@@ -126,52 +126,48 @@ function Truck3D({
 }) {
   return (
     <group position={position} rotation={rotation} onClick={onClick}>
-      {/* Cabina */}
-      <mesh position={[0.5, 0.35, 0]} castShadow>
+      {/* Cabina (al frente, hacia +X) */}
+      <mesh position={[0.6, 0.35, 0]} castShadow>
         <boxGeometry args={[0.4, 0.4, 0.5]} />
         <meshStandardMaterial color={color} />
       </mesh>
 
       {/* Parabrisas */}
-      <mesh position={[0.72, 0.38, 0]}>
+      <mesh position={[0.82, 0.38, 0]}>
         <boxGeometry args={[0.02, 0.25, 0.4]} />
         <meshStandardMaterial color="#1a1a2e" />
       </mesh>
 
-      {/* Container */}
-      <mesh position={[-0.2, 0.4, 0]} castShadow>
-        <boxGeometry args={[1, 0.6, 0.55]} />
+      {/* Container/Acoplado */}
+      <mesh position={[-0.3, 0.4, 0]} castShadow>
+        <boxGeometry args={[1.2, 0.6, 0.55]} />
         <meshStandardMaterial color={isSelected ? "#fff" : "#e5e5e5"} />
       </mesh>
 
       {/* Chasis */}
       <mesh position={[0, 0.1, 0]}>
-        <boxGeometry args={[1.5, 0.08, 0.4]} />
+        <boxGeometry args={[1.8, 0.08, 0.4]} />
         <meshStandardMaterial color="#262626" />
       </mesh>
 
-      {/* Ruedas (cajas simples, sin cilindros) */}
-      <mesh position={[0.5, 0.1, 0.25]}>
-        <boxGeometry args={[0.15, 0.2, 0.08]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
-      <mesh position={[0.5, 0.1, -0.25]}>
-        <boxGeometry args={[0.15, 0.2, 0.08]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
-      <mesh position={[-0.4, 0.1, 0.25]}>
-        <boxGeometry args={[0.18, 0.2, 0.1]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
-      <mesh position={[-0.4, 0.1, -0.25]}>
-        <boxGeometry args={[0.18, 0.2, 0.1]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
+      {/* Ruedas */}
+      {[0.6, -0.3, -0.6].map((x, i) => (
+        <group key={i}>
+          <mesh position={[x, 0.1, 0.25]}>
+            <boxGeometry args={[0.12, 0.18, 0.06]} />
+            <meshStandardMaterial color="#1a1a1a" />
+          </mesh>
+          <mesh position={[x, 0.1, -0.25]}>
+            <boxGeometry args={[0.12, 0.18, 0.06]} />
+            <meshStandardMaterial color="#1a1a1a" />
+          </mesh>
+        </group>
+      ))}
 
-      {/* Borde cuando seleccionado */}
+      {/* Selección */}
       {isSelected && (
         <mesh position={[0, 0.35, 0]}>
-          <boxGeometry args={[1.7, 0.8, 0.7]} />
+          <boxGeometry args={[2, 0.8, 0.7]} />
           <meshBasicMaterial color="#F97316" transparent opacity={0.15} />
         </mesh>
       )}
@@ -179,7 +175,76 @@ function Truck3D({
   );
 }
 
-// Camión en ruta (siempre de BS AS a Jujuy = izquierda a derecha)
+// Van de reparto (última milla)
+function Van3D({
+  position,
+  rotation = [0, 0, 0],
+  color = "#22c55e",
+  onClick,
+  isSelected,
+}: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  color?: string;
+  onClick?: () => void;
+  isSelected?: boolean;
+}) {
+  return (
+    <group position={position} rotation={rotation} onClick={onClick}>
+      {/* Cabina */}
+      <mesh position={[0.25, 0.25, 0]} castShadow>
+        <boxGeometry args={[0.35, 0.35, 0.4]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+
+      {/* Parabrisas */}
+      <mesh position={[0.44, 0.28, 0]}>
+        <boxGeometry args={[0.02, 0.2, 0.32]} />
+        <meshStandardMaterial color="#1a1a2e" />
+      </mesh>
+
+      {/* Caja de carga */}
+      <mesh position={[-0.15, 0.28, 0]} castShadow>
+        <boxGeometry args={[0.5, 0.4, 0.42]} />
+        <meshStandardMaterial color={isSelected ? "#fff" : "#f5f5f5"} />
+      </mesh>
+
+      {/* Chasis */}
+      <mesh position={[0, 0.08, 0]}>
+        <boxGeometry args={[0.9, 0.06, 0.35]} />
+        <meshStandardMaterial color="#262626" />
+      </mesh>
+
+      {/* Ruedas */}
+      <mesh position={[0.25, 0.08, 0.2]}>
+        <boxGeometry args={[0.1, 0.14, 0.05]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      <mesh position={[0.25, 0.08, -0.2]}>
+        <boxGeometry args={[0.1, 0.14, 0.05]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      <mesh position={[-0.25, 0.08, 0.2]}>
+        <boxGeometry args={[0.1, 0.14, 0.05]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      <mesh position={[-0.25, 0.08, -0.2]}>
+        <boxGeometry args={[0.1, 0.14, 0.05]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+
+      {/* Selección */}
+      {isSelected && (
+        <mesh position={[0, 0.25, 0]}>
+          <boxGeometry args={[1, 0.6, 0.55]} />
+          <meshBasicMaterial color="#22c55e" transparent opacity={0.15} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+// Camión en ruta (BS AS → Jujuy)
 function TruckOnRoute({
   trip,
   onSelect,
@@ -189,14 +254,14 @@ function TruckOnRoute({
   onSelect: () => void;
   isSelected: boolean;
 }) {
-  // Siempre de izquierda (-3) a derecha (+3)
+  // De izquierda (-3) a derecha (+3), cabina mirando a derecha
   const x = -3 + 6 * trip.progress;
 
   return (
     <group position={[x, 0, 0]}>
       <Truck3D
         position={[0, 0, 0]}
-        rotation={[0, Math.PI, 0]}
+        rotation={[0, 0, 0]} // Cabina hacia +X (derecha = Jujuy)
         onClick={onSelect}
         isSelected={isSelected}
       />
@@ -239,17 +304,98 @@ function TruckOnRoute({
   );
 }
 
-// Carretera simple
+// Camión estacionado con estado (Cargando/Descargando)
+function ParkedTruck({
+  trip,
+  position,
+  rotation,
+  status,
+  onSelect,
+  isSelected,
+}: {
+  trip: TripData;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  status: "loading" | "unloading";
+  onSelect: () => void;
+  isSelected: boolean;
+}) {
+  const statusLabel = status === "loading" ? "⏳ Cargando" : "📦 Descargando";
+  const statusColor = status === "loading" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700";
+
+  return (
+    <group>
+      <Truck3D
+        position={position}
+        rotation={rotation}
+        onClick={onSelect}
+        isSelected={isSelected}
+      />
+      <Html position={[position[0], position[1] + 1, position[2]]} center>
+        <div 
+          className={`bg-white rounded-lg shadow-lg px-2.5 py-1.5 cursor-pointer border-2 min-w-[100px]
+            ${isSelected ? 'border-orange-500' : 'border-transparent hover:border-neutral-200'}`}
+          onClick={onSelect}
+        >
+          <div className="text-[10px] font-bold text-neutral-700">
+            {trip.vehiclePlate || `#${trip.id}`}
+          </div>
+          <div className={`text-[10px] mt-0.5 px-1.5 py-0.5 rounded ${statusColor}`}>
+            {statusLabel}
+          </div>
+          <div className="text-[10px] text-neutral-400 mt-0.5">
+            {trip.shipments.length} envíos
+          </div>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+// Van de reparto
+function DeliveryVan({
+  shipmentCount,
+  position,
+  rotation,
+  onClick,
+  isSelected,
+}: {
+  shipmentCount: number;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  onClick: () => void;
+  isSelected: boolean;
+}) {
+  return (
+    <group>
+      <Van3D
+        position={position}
+        rotation={rotation}
+        onClick={onClick}
+        isSelected={isSelected}
+      />
+      <Html position={[position[0], position[1] + 0.8, position[2]]} center>
+        <div 
+          className={`bg-white rounded-lg shadow px-2 py-1 cursor-pointer border-2
+            ${isSelected ? 'border-green-500' : 'border-transparent hover:border-green-200'}`}
+          onClick={onClick}
+        >
+          <div className="text-[10px] font-bold text-green-600">🚐 Reparto</div>
+          <div className="text-[10px] text-neutral-500">{shipmentCount} envíos</div>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+// Carretera
 function Road() {
   return (
     <group>
-      {/* Asfalto */}
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[14, 1.2]} />
         <meshStandardMaterial color="#404040" />
       </mesh>
-
-      {/* Líneas blancas */}
       <mesh position={[0, 0.02, 0.55]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[14, 0.05]} />
         <meshStandardMaterial color="#ffffff" />
@@ -258,8 +404,6 @@ function Road() {
         <planeGeometry args={[14, 0.05]} />
         <meshStandardMaterial color="#ffffff" />
       </mesh>
-
-      {/* Líneas amarillas centro (discontinuas) */}
       {Array.from({ length: 12 }).map((_, i) => (
         <mesh key={i} position={[-5.5 + i, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[0.4, 0.06]} />
@@ -282,13 +426,27 @@ function Scene({ warehouseData, tripsInTransit, onSelectShipments }: LogisticsSc
     onSelectShipments(warehouse.shipments, `${warehouse.name} - ${warehouse.city}`);
   };
 
-  const handleTripClick = (trip: TripData) => {
+  const handleTripClick = (trip: TripData, label?: string) => {
     setSelectedItem(`trip-${trip.id}`);
-    onSelectShipments(trip.shipments, `En ruta: ${trip.origin} → ${trip.destination}`);
+    onSelectShipments(trip.shipments, label || `Viaje: ${trip.origin} → ${trip.destination}`);
+  };
+
+  const handleRepartoClick = (shipments: ShipmentData[], city: string) => {
+    setSelectedItem(`reparto-${city}`);
+    onSelectShipments(shipments, `En reparto - ${city}`);
   };
 
   const bsas = warehouseData.find(w => w.id === "bsas");
   const jujuy = warehouseData.find(w => w.id === "jujuy");
+
+  // Camiones cargando en BS AS (status = loading)
+  const loadingTrucks = bsas?.trucks.filter(t => t.status === "loading") || [];
+  
+  // Camiones descargando en Jujuy (status = arrived)
+  const unloadingTrucks = jujuy?.trucks.filter(t => t.status === "arrived") || [];
+
+  // Envíos en reparto en Jujuy
+  const repartoShipments = jujuy?.shipments.filter(s => s.status === "en_reparto") || [];
 
   return (
     <>
@@ -314,7 +472,7 @@ function Scene({ warehouseData, tripsInTransit, onSelectShipments }: LogisticsSc
           city={bsas.city}
           color="#3b82f6"
           shipmentCount={bsas.shipments.length}
-          truckCount={bsas.trucks.length}
+          truckCount={loadingTrucks.length}
           onClick={() => handleWarehouseClick(bsas)}
           isSelected={selectedItem === "warehouse-bsas"}
         />
@@ -328,56 +486,55 @@ function Scene({ warehouseData, tripsInTransit, onSelectShipments }: LogisticsSc
           city={jujuy.city}
           color="#22c55e"
           shipmentCount={jujuy.shipments.length}
-          truckCount={jujuy.trucks.length}
+          truckCount={unloadingTrucks.length}
           onClick={() => handleWarehouseClick(jujuy)}
           isSelected={selectedItem === "warehouse-jujuy"}
         />
       )}
 
-      {/* Camiones estacionados en BS AS */}
-      {bsas?.trucks.map((trip, i) => (
-        <group key={`bsas-truck-${trip.id}`}>
-          <Truck3D
-            position={[bsasPos[0] + 2.5, 0, bsasPos[2] + 1.5 + i * 1]}
-            rotation={[0, Math.PI / 2, 0]}
-            onClick={() => handleTripClick(trip)}
-            isSelected={selectedItem === `trip-${trip.id}`}
-          />
-          <Html position={[bsasPos[0] + 2.5, 0.9, bsasPos[2] + 1.5 + i * 1]} center>
-            <div className="bg-white/90 rounded px-2 py-1 text-[10px] shadow cursor-pointer"
-                 onClick={() => handleTripClick(trip)}>
-              <span className="font-medium">{trip.vehiclePlate || `#${trip.id}`}</span>
-              <span className="text-neutral-400 ml-1">• {trip.shipments.length} env.</span>
-            </div>
-          </Html>
-        </group>
+      {/* Camiones CARGANDO en BS AS (al costado del depósito) */}
+      {loadingTrucks.map((trip, i) => (
+        <ParkedTruck
+          key={`loading-${trip.id}`}
+          trip={trip}
+          position={[bsasPos[0] + 2.5, 0, bsasPos[2] + 1.5 + i * 1.2]}
+          rotation={[0, -Math.PI / 2, 0]} // Mirando hacia el depósito
+          status="loading"
+          onSelect={() => handleTripClick(trip, `Cargando: ${trip.vehiclePlate || `Viaje #${trip.id}`}`)}
+          isSelected={selectedItem === `trip-${trip.id}`}
+        />
       ))}
 
-      {/* Camiones estacionados en Jujuy */}
-      {jujuy?.trucks.map((trip, i) => (
-        <group key={`jujuy-truck-${trip.id}`}>
-          <Truck3D
-            position={[jujuyPos[0] - 2.5, 0, jujuyPos[2] + 1.5 + i * 1]}
-            rotation={[0, -Math.PI / 2, 0]}
-            onClick={() => handleTripClick(trip)}
-            isSelected={selectedItem === `trip-${trip.id}`}
-          />
-          <Html position={[jujuyPos[0] - 2.5, 0.9, jujuyPos[2] + 1.5 + i * 1]} center>
-            <div className="bg-white/90 rounded px-2 py-1 text-[10px] shadow cursor-pointer"
-                 onClick={() => handleTripClick(trip)}>
-              <span className="font-medium">{trip.vehiclePlate || `#${trip.id}`}</span>
-              <span className="text-neutral-400 ml-1">• {trip.shipments.length} env.</span>
-            </div>
-          </Html>
-        </group>
+      {/* Camiones DESCARGANDO en Jujuy (al costado del depósito) */}
+      {unloadingTrucks.map((trip, i) => (
+        <ParkedTruck
+          key={`unloading-${trip.id}`}
+          trip={trip}
+          position={[jujuyPos[0] - 2.5, 0, jujuyPos[2] + 1.5 + i * 1.2]}
+          rotation={[0, Math.PI / 2, 0]} // Mirando hacia el depósito
+          status="unloading"
+          onSelect={() => handleTripClick(trip, `Descargando: ${trip.vehiclePlate || `Viaje #${trip.id}`}`)}
+          isSelected={selectedItem === `trip-${trip.id}`}
+        />
       ))}
 
-      {/* Camiones en tránsito (siempre de BS AS a Jujuy) */}
+      {/* Van de REPARTO en Jujuy (saliendo del depósito) */}
+      {repartoShipments.length > 0 && (
+        <DeliveryVan
+          shipmentCount={repartoShipments.length}
+          position={[jujuyPos[0] + 2.5, 0, jujuyPos[2] + 2]}
+          rotation={[0, Math.PI / 4, 0]} // Saliendo hacia afuera
+          onClick={() => handleRepartoClick(repartoShipments, "Jujuy")}
+          isSelected={selectedItem === "reparto-Jujuy"}
+        />
+      )}
+
+      {/* Camiones en TRÁNSITO (en la ruta) */}
       {tripsInTransit.map(trip => (
         <TruckOnRoute
           key={`transit-${trip.id}`}
           trip={trip}
-          onSelect={() => handleTripClick(trip)}
+          onSelect={() => handleTripClick(trip, `En ruta: Buenos Aires → Jujuy`)}
           isSelected={selectedItem === `trip-${trip.id}`}
         />
       ))}

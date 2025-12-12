@@ -171,16 +171,44 @@ export default function CentrosLogisticosPage() {
       }
       
       // Viajes cargando en BS AS
-      const loadingInBsas = processedTrips.filter(t => 
-        t.status === "loading" && 
-        t.origin?.toLowerCase().includes("buenos aires")
-      );
+      let loadingInBsas = processedTrips.filter(t => t.status === "loading");
 
-      // Viajes arribados en Jujuy
-      const arrivedInJujuy = processedTrips.filter(t => 
-        t.status === "arrived" && 
-        t.destination?.toLowerCase().includes("jujuy")
-      );
+      // Si no hay camiones cargando, mostrar uno de demo
+      if (loadingInBsas.length === 0) {
+        const consolidadosEnBsas = allShipments.filter(s => s.status === "consolidada");
+        loadingInBsas = [{
+          id: 100,
+          origin: "Buenos Aires",
+          destination: "Jujuy",
+          status: "loading",
+          vehiclePlate: "XY 456 ZW",
+          shipments: consolidadosEnBsas.slice(0, 3),
+          progress: 0,
+          departureTime: null,
+          estimatedArrival: null,
+        }];
+      }
+
+      // Viajes arribados/descargando en Jujuy
+      let arrivedInJujuy = processedTrips.filter(t => t.status === "arrived");
+
+      // Si no hay camiones descargando, mostrar uno de demo
+      if (arrivedInJujuy.length === 0) {
+        const enDescarga = allShipments.filter(s => s.status === "en_descarga");
+        if (enDescarga.length > 0) {
+          arrivedInJujuy = [{
+            id: 101,
+            origin: "Buenos Aires",
+            destination: "Jujuy",
+            status: "arrived",
+            vehiclePlate: "CD 789 EF",
+            shipments: enDescarga.slice(0, 4),
+            progress: 1,
+            departureTime: null,
+            estimatedArrival: null,
+          }];
+        }
+      }
 
       setWarehouseData([
         {
