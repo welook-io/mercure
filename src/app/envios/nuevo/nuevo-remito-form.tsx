@@ -28,6 +28,70 @@ const DESTINOS = [
   'BUENOS AIRES',
 ];
 
+// Formatear número como moneda argentina
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+// Parsear string con formato de moneda a número
+function parseCurrency(value: string): string {
+  // Remover todo excepto números, comas y puntos
+  const cleaned = value.replace(/[^\d,.-]/g, '');
+  // Convertir formato argentino (1.234,56) a número
+  const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+  const num = parseFloat(normalized);
+  return isNaN(num) ? '' : num.toString();
+}
+
+// Input de moneda con formato
+function CurrencyInput({ 
+  name, 
+  value, 
+  onChange, 
+  placeholder = '0,00',
+  label,
+  prefix = '$'
+}: { 
+  name: string; 
+  value: string; 
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  label: string;
+  prefix?: string;
+}) {
+  const numValue = parseFloat(value) || 0;
+  const displayValue = value ? formatCurrency(numValue) : '';
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = parseCurrency(e.target.value);
+    onChange({ ...e, target: { ...e.target, name, value: rawValue } });
+  };
+
+  return (
+    <div>
+      <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
+        {label}
+      </label>
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm">
+          {prefix}
+        </span>
+        <input
+          type="text"
+          name={name}
+          value={displayValue}
+          onChange={handleChange}
+          placeholder={placeholder}
+          className="w-full h-10 pl-7 pr-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0 text-right font-mono"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function NuevoRemitoForm({ entities }: { entities: Entity[] }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -337,19 +401,12 @@ export function NuevoRemitoForm({ entities }: { entities: Entity[] }) {
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-            Valor Declarado
-          </label>
-          <input
-            type="number"
-            name="declared_value"
-            value={formData.declared_value}
-            onChange={handleChange}
-            step="0.01"
-            className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-          />
-        </div>
+        <CurrencyInput
+          name="declared_value"
+          value={formData.declared_value}
+          onChange={handleChange}
+          label="Valor Declarado"
+        />
       </div>
 
       {/* Costos */}
@@ -385,57 +442,40 @@ export function NuevoRemitoForm({ entities }: { entities: Entity[] }) {
         )}
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-              Flete $
-            </label>
-            <input
-              type="number"
-              name="freight_cost"
-              value={formData.freight_cost}
-              onChange={handleChange}
-              step="0.01"
-              placeholder="0.00"
-              className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-              Seguro $
-            </label>
-            <input
-              type="number"
-              name="insurance_cost"
-              value={formData.insurance_cost}
-              onChange={handleChange}
-              step="0.01"
-              placeholder="0.00"
-              className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-            />
-          </div>
+          <CurrencyInput
+            name="freight_cost"
+            value={formData.freight_cost}
+            onChange={handleChange}
+            label="Flete"
+          />
+          <CurrencyInput
+            name="insurance_cost"
+            value={formData.insurance_cost}
+            onChange={handleChange}
+            label="Seguro"
+          />
         </div>
       </div>
 
       {/* Resumen de costos */}
       {(flete > 0 || seguro > 0) && (
-        <div className="bg-neutral-50 rounded-lg p-4">
+        <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
           <div className="grid grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="text-neutral-500">Flete:</span>
-              <span className="ml-2 font-medium">${flete.toLocaleString('es-AR')}</span>
+            <div className="text-center">
+              <div className="text-neutral-400 text-xs uppercase mb-1">Flete</div>
+              <div className="font-mono font-medium">$ {formatCurrency(flete)}</div>
             </div>
-            <div>
-              <span className="text-neutral-500">Seguro:</span>
-              <span className="ml-2 font-medium">${seguro.toLocaleString('es-AR')}</span>
+            <div className="text-center">
+              <div className="text-neutral-400 text-xs uppercase mb-1">Seguro</div>
+              <div className="font-mono font-medium">$ {formatCurrency(seguro)}</div>
             </div>
-            <div>
-              <span className="text-neutral-500">IVA 21%:</span>
-              <span className="ml-2 font-medium">${iva.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+            <div className="text-center">
+              <div className="text-neutral-400 text-xs uppercase mb-1">IVA 21%</div>
+              <div className="font-mono font-medium">$ {formatCurrency(iva)}</div>
             </div>
-            <div>
-              <span className="text-neutral-500">Total:</span>
-              <span className="ml-2 font-bold text-orange-600">${total.toLocaleString('es-AR', { maximumFractionDigits: 2 })}</span>
+            <div className="text-center bg-orange-50 rounded py-1 -my-1">
+              <div className="text-orange-600 text-xs uppercase mb-1 font-medium">Total</div>
+              <div className="font-mono font-bold text-orange-600">$ {formatCurrency(total)}</div>
             </div>
           </div>
         </div>
