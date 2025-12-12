@@ -38,6 +38,7 @@ export const PERMISSIONS = {
   dashboard: ["super_admin", "admin", "administrativo", "auxiliar_deposito", "chofer", "atencion_cliente", "contabilidad", "viewer"],
   
   // Operaciones
+  centros: ["super_admin", "admin", "administrativo", "auxiliar_deposito", "chofer"],
   recepcion: ["super_admin", "admin", "administrativo", "auxiliar_deposito"],
   consolidacion: ["super_admin", "admin", "administrativo", "auxiliar_deposito"],
   envios: ["super_admin", "admin", "administrativo", "auxiliar_deposito", "chofer"],
@@ -84,6 +85,7 @@ export type Permission = keyof typeof PERMISSIONS;
 // Mapeo de rutas a permisos
 export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/": "dashboard",
+  "/operaciones/centros": "centros",
   "/recepcion": "recepcion",
   "/consolidacion": "consolidacion",
   "/envios": "envios",

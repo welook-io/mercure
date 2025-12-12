@@ -31,6 +31,7 @@ const menuAreas: MenuArea[] = [
     label: "Operaciones",
     items: [
       { href: "/", label: "Dashboard", description: "Vista general" },
+      { href: "/operaciones/centros", label: "Centros 3D", description: "Vista en tiempo real" },
       { href: "/recepcion", label: "Recepción", description: "Ingreso de mercadería" },
       { href: "/consolidacion", label: "Consolidación", description: "Asignar a viajes" },
       { href: "/envios", label: "Envíos", description: "En tránsito" },
