@@ -296,3 +296,4 @@ export function ImageCapture({ images, onImagesChange, onAnalyze, isAnalyzing }:
   );
 }
 
+

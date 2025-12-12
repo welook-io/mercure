@@ -117,6 +117,28 @@ export async function POST(request: NextRequest) {
 // 1 m³ = 300 kg (estándar en transporte terrestre)
 const VOLUMETRIC_FACTOR = 300;
 
+// Helper: Calcular peso a cobrar (el mayor entre real y volumétrico)
+function calcularPesoACobrar(cargo: { weightKg?: number; volumeM3?: number }): {
+  pesoReal: number;
+  pesoVolumetrico: number;
+  pesoACobrar: number;
+  usaVolumen: boolean;
+} {
+  const pesoReal = cargo.weightKg || 0;
+  const pesoVolumetrico = cargo.volumeM3 ? cargo.volumeM3 * VOLUMETRIC_FACTOR : 0;
+  const pesoACobrar = Math.max(pesoReal, pesoVolumetrico);
+  const usaVolumen = pesoVolumetrico > pesoReal;
+  
+  console.log('[detect-pricing] Cálculo de peso:', {
+    pesoReal,
+    pesoVolumetrico,
+    pesoACobrar,
+    usaVolumen: usaVolumen ? 'VOLUMEN' : 'PESO REAL'
+  });
+  
+  return { pesoReal, pesoVolumetrico, pesoACobrar, usaVolumen };
+}
+
 // CAMINO A: Cliente Cuenta Corriente
 async function handlePathA(
   client: any, 
@@ -139,10 +161,7 @@ async function handlePathA(
   const insuranceRate = parseFloat(terms?.insurance_rate || '0.008'); // 8 por mil
 
   // Calcular peso a cobrar: el MAYOR entre peso real y peso volumétrico
-  const pesoReal = cargo.weightKg || 0;
-  const pesoVolumetrico = cargo.volumeM3 ? cargo.volumeM3 * VOLUMETRIC_FACTOR : 0;
-  const pesoACobrar = Math.max(pesoReal, pesoVolumetrico);
-  const usaVolumen = pesoVolumetrico > pesoReal;
+  const { pesoReal, pesoVolumetrico, pesoACobrar, usaVolumen } = calcularPesoACobrar(cargo);
 
   if (pesoACobrar > 0) {
     // Buscar tarifa por peso (redondear al múltiplo de 10 más cercano hacia arriba)
@@ -164,6 +183,7 @@ async function handlePathA(
     if (tariff) {
       const basePrice = parseFloat(tariff.price) || 0;
       breakdown.flete_lista = basePrice;
+      breakdown.peso_cobrado = pesoACobrar;
 
       // Aplicar modificador (descuento/recargo)
       let fleteConModificador = basePrice;
@@ -182,7 +202,18 @@ async function handlePathA(
       // Total = flete final + seguro
       price = fleteConModificador + (breakdown.seguro || 0);
       
-      console.log('Precio calculado:', price, 'Breakdown:', breakdown);
+      console.log('[detect-pricing] Path A - Precio calculado:', {
+        cliente: client.legal_name,
+        pesoReal,
+        pesoVolumetrico,
+        pesoACobrar,
+        usaPeso: usaVolumen ? 'VOLUMETRICO' : 'REAL',
+        weightBucket,
+        tarifaEncontrada: tariff.weight_to_kg,
+        precioLista: basePrice,
+        modificador: tariffModifier,
+        precioFinal: price
+      });
     } else {
       // No hay tarifa en la tabla, usar precio por kg por defecto
       console.log('No se encontró tarifa, usando precio por defecto');
@@ -313,18 +344,30 @@ async function handlePathC(
     .single();
 
   let price = null;
-  let breakdown = undefined;
+  let breakdown: Record<string, number> | undefined = undefined;
 
-  if (generalTariff && cargo.weightKg) {
-    const basePorPeso = (generalTariff.price_per_kg || 500) * cargo.weightKg;
+  // Calcular peso a cobrar: el MAYOR entre peso real y peso volumétrico
+  const { pesoACobrar, usaVolumen } = calcularPesoACobrar(cargo);
+
+  if (generalTariff && pesoACobrar > 0) {
+    const basePorPeso = (generalTariff.price_per_kg || 500) * pesoACobrar;
     const minimo = generalTariff.price || 5000;
     price = Math.max(basePorPeso, minimo);
     
     breakdown = {
       base: minimo,
       porPeso: basePorPeso,
-      aplicado: price
+      aplicado: price,
+      peso_cobrado: pesoACobrar
     };
+    
+    console.log('[detect-pricing] Path C - Tarifa general:', {
+      pesoACobrar,
+      usaVolumen: usaVolumen ? 'VOLUMEN' : 'PESO REAL',
+      basePorPeso,
+      minimo,
+      precioFinal: price
+    });
   }
 
   return {
@@ -390,4 +433,5 @@ async function findPendingQuotation(cuit?: string, name?: string, destination?: 
 
   return null;
 }
+
 

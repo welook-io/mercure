@@ -32,3 +32,4 @@ export function AccessDenied({ message }: AccessDeniedProps) {
     </div>
   );
 }
+

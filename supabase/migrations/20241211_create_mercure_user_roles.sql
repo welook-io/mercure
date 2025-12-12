@@ -86,3 +86,4 @@ COMMENT ON TABLE public.mercure_user_roles IS 'Roles específicos de Mercure par
 COMMENT ON COLUMN public.mercure_user_roles.role IS 'Rol del usuario: admin, administrativo, auxiliar_deposito, chofer, atencion_cliente, contabilidad, viewer';
 COMMENT ON COLUMN public.mercure_user_roles.is_active IS 'Si el rol está activo. Desactivar en lugar de borrar para historial';
 
+

@@ -129,3 +129,4 @@ export function Terrain() {
     </group>
   );
 }
+
