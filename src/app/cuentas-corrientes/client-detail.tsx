@@ -120,7 +120,8 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
         .order('created_at', { ascending: false });
 
       const mappedShipments: Shipment[] = (shipmentsData || []).map(s => {
-        const recipient = s.recipient as { legal_name: string } | null;
+        const recipientData = s.recipient as { legal_name: string } | { legal_name: string }[] | null;
+        const recipient = Array.isArray(recipientData) ? recipientData[0] : recipientData;
         const declaredValue = s.declared_value || 0;
         const calculatedAmount = (declaredValue * 0.05) + (declaredValue * 0.008);
 

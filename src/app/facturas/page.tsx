@@ -38,7 +38,7 @@ export default async function FacturasPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-200 pb-3 mb-4 gap-2">
             <h1 className="text-lg font-medium text-neutral-900">Facturas</h1>
             <Link 
-              href="/factura_test"
+              href="/facturas/nueva"
               className="h-8 px-3 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded w-full sm:w-auto flex items-center justify-center gap-2"
             >
               <FileText className="w-4 h-4" />
@@ -47,7 +47,7 @@ export default async function FacturasPage() {
           </div>
           <div className="border border-neutral-200 rounded overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[700px]">
+              <table className="w-full text-sm min-w-[800px]">
                 <thead>
                   <tr className="bg-neutral-50 border-b border-neutral-200">
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Tipo</th>
@@ -58,19 +58,20 @@ export default async function FacturasPage() {
                     <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">IVA</th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Total</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">CAE</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-neutral-500 uppercase">Modo</th>
                     <th className="px-3 py-2 text-center text-xs font-medium text-neutral-500 uppercase">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {error ? (
                     <tr>
-                      <td colSpan={9} className="px-3 py-8 text-center text-red-500">
+                      <td colSpan={10} className="px-3 py-8 text-center text-red-500">
                         Error al cargar facturas: {error.message}
                       </td>
                     </tr>
                   ) : !facturas || facturas.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-3 py-8 text-center text-neutral-400">
+                      <td colSpan={10} className="px-3 py-8 text-center text-neutral-400">
                         No hay facturas emitidas
                       </td>
                     </tr>
@@ -102,6 +103,15 @@ export default async function FacturasPage() {
                         </td>
                         <td className="px-3 py-2 font-mono text-xs text-neutral-500">
                           {factura.cae}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            factura.emission_mode === 'automatic' 
+                              ? 'bg-blue-50 text-blue-700' 
+                              : 'bg-neutral-100 text-neutral-600'
+                          }`}>
+                            {factura.emission_mode === 'automatic' ? 'Auto' : 'Manual'}
+                          </span>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <a

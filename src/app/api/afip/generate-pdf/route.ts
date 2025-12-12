@@ -371,7 +371,7 @@ export async function GET(request: NextRequest) {
     
     await browser.close();
     
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(Buffer.from(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="Factura_${invoiceNumber.replace('-', '_')}.pdf"`,
