@@ -21,8 +21,15 @@ export async function GET(request: NextRequest) {
     const pdfBuffer = await generateInvoicePdf(invoiceData);
     console.log('PDF generado, tamaño:', pdfBuffer.length);
 
-    // Usar Resend directamente con email de prueba
-    const resend = new Resend('re_iAeZ9G4W_6FFBQh9SRpVjTAzCac1Kxq4b');
+    // Usar Resend con API key desde variable de entorno
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'RESEND_API_KEY no configurada' 
+      }, { status: 500 });
+    }
+    const resend = new Resend(apiKey);
 
     const formatCurrency = (value: number) => 
       new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value);

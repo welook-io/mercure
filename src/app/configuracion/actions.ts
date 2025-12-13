@@ -4,6 +4,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { isSuperAdmin, ALL_PERMISSIONS, Permission } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
+import { logPermissionChange, logAudit } from "@/lib/audit-log";
 
 // ID de la organización Mercure SRL
 const MERCURE_ORG_ID = "620245b9-bac0-434b-b32e-2e07e9428751";
@@ -37,6 +38,13 @@ export async function updateUserPermission(
   }
 
   try {
+    // Obtener email del usuario target
+    const { data: targetUser } = await supabaseAdmin
+      .from("users")
+      .select("email")
+      .eq("id", userId)
+      .single();
+
     // Upsert del permiso
     const { error } = await supabaseAdmin
       .from("mercure_user_permissions")
@@ -52,6 +60,9 @@ export async function updateUserPermission(
       );
 
     if (error) throw error;
+
+    // Registrar en audit log
+    await logPermissionChange(userId, targetUser?.email || userId, permission, hasAccess);
 
     revalidatePath("/configuracion");
     return { success: true };
@@ -84,6 +95,13 @@ export async function updateUserPermissions(
   }
 
   try {
+    // Obtener email del usuario target
+    const { data: targetUser } = await supabaseAdmin
+      .from("users")
+      .select("email")
+      .eq("id", userId)
+      .single();
+
     // Crear array de permisos para upsert
     const permissionsToUpsert = Object.entries(permissions).map(([permission, hasAccess]) => ({
       user_id: userId,
@@ -99,6 +117,19 @@ export async function updateUserPermissions(
       });
 
     if (error) throw error;
+
+    // Registrar en audit log
+    const changedPermissions = Object.entries(permissions)
+      .map(([p, v]) => `${p}:${v ? "✓" : "✗"}`)
+      .join(", ");
+    await logAudit({
+      action: "update",
+      module: "configuracion",
+      description: `Actualizó permisos de ${targetUser?.email || userId}: ${changedPermissions}`,
+      targetType: "permission",
+      targetId: userId,
+      newValue: permissions,
+    });
 
     revalidatePath("/configuracion");
     return { success: true };
@@ -128,6 +159,13 @@ export async function addUserToOrg(userId: string) {
   }
 
   try {
+    // Obtener email del usuario target
+    const { data: targetUser } = await supabaseAdmin
+      .from("users")
+      .select("email")
+      .eq("id", userId)
+      .single();
+
     // Verificar si ya existe
     const { data: existing } = await supabaseAdmin
       .from("user_organizations")
@@ -154,6 +192,15 @@ export async function addUserToOrg(userId: string) {
           is_active: true,
         });
     }
+
+    // Registrar en audit log
+    await logAudit({
+      action: "assign",
+      module: "configuracion",
+      description: `Agregó usuario ${targetUser?.email || userId} a la organización`,
+      targetType: "user",
+      targetId: userId,
+    });
 
     revalidatePath("/configuracion");
     return { success: true };
@@ -202,6 +249,15 @@ export async function removeUserFromOrg(userId: string, targetEmail: string) {
       .eq("user_id", userId);
 
     if (error) throw error;
+
+    // Registrar en audit log
+    await logAudit({
+      action: "revoke",
+      module: "configuracion",
+      description: `Removió usuario ${targetEmail} de la organización`,
+      targetType: "user",
+      targetId: userId,
+    });
 
     revalidatePath("/configuracion");
     return { success: true };

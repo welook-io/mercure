@@ -4,6 +4,7 @@ import { CONCEPT_CODES, DOC_TYPE_CODES, InvoiceType } from '@/lib/afip/types';
 import { supabase } from '@/lib/supabase';
 import { sendInvoiceEmail, getClientEmail } from '@/lib/email';
 import { generateInvoicePdf } from '@/lib/invoice-pdf';
+import { logInvoiceCreated } from '@/lib/audit-log';
 
 interface FacturaNuevaRequest {
   cliente_id?: number;
@@ -127,6 +128,9 @@ export async function POST(request: NextRequest) {
 
     if (invoiceError) {
       console.error('Error guardando factura:', invoiceError);
+    } else if (invoiceData) {
+      // Registrar en audit log
+      await logInvoiceCreated(invoiceData.id, invoiceNumber, body.cliente_nombre, body.total);
     }
 
     // Si es modo automático, vincular los remitos con la factura

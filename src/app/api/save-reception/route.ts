@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { logShipmentCreated } from '@/lib/audit-log';
+import { auth, currentUser } from '@clerk/nextjs/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -243,6 +245,29 @@ export async function POST(request: NextRequest) {
           received_at: new Date().toISOString(),
         }
       });
+
+    // Registrar en audit log con info del usuario
+    let userOverride: { userId?: string; email?: string; name?: string } | undefined;
+    try {
+      const { userId: clerkId } = await auth();
+      if (clerkId) {
+        const user = await currentUser();
+        userOverride = {
+          email: user?.emailAddresses[0]?.emailAddress,
+          name: user?.fullName || user?.firstName || undefined,
+        };
+      }
+    } catch {
+      // Si no se puede obtener el usuario, continuar sin él
+    }
+
+    await logShipmentCreated(
+      shipment.id, 
+      data.deliveryNoteNumber || null,
+      data.senderName,
+      data.recipientName,
+      userOverride
+    );
 
     return NextResponse.json({ 
       success: true, 

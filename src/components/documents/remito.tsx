@@ -7,9 +7,6 @@ interface QuotationData {
   insurance_cost: number;
   total_price: number;
   includes_iva: boolean;
-  pickup_cost?: number;
-  delivery_cost?: number;
-  storage_cost?: number;
 }
 
 interface ShipmentData {
@@ -93,16 +90,25 @@ export function RemitoDocument({ shipment }: RemitoDocumentProps) {
   const timeStr = formatTime(shipment.created_at);
   const isCtaCte = shipment.payment_terms === 'cuenta_corriente';
 
-  // Costos
-  const quotation: QuotationData = shipment.quotation || {
-    base_price: Number(shipment.weight_kg) * 180,
-    insurance_cost: Number(shipment.declared_value) * 0.008,
+  // Costos - Si no hay cotización, mostrar "Pendiente de cotizar"
+  // NUNCA usar fórmulas hardcodeadas - el precio real viene de la cotización
+  // Nota: Los campos numeric de Supabase pueden llegar como strings, hay que parsearlos
+  const rawQuotation = shipment.quotation;
+  const quotation: QuotationData = rawQuotation ? {
+    base_price: Number(rawQuotation.base_price) || 0,
+    insurance_cost: Number(rawQuotation.insurance_cost) || 0,
+    total_price: Number(rawQuotation.total_price) || 0,
+    includes_iva: rawQuotation.includes_iva || false,
+  } : {
+    base_price: 0,
+    insurance_cost: 0,
     total_price: 0,
     includes_iva: false,
   };
+  
+  const hasQuotation = !!rawQuotation && quotation.total_price > 0;
 
-  const subtotal = quotation.base_price + quotation.insurance_cost + 
-    (quotation.pickup_cost || 0) + (quotation.delivery_cost || 0) + (quotation.storage_cost || 0);
+  const subtotal = quotation.base_price + quotation.insurance_cost;
   const iva = quotation.includes_iva ? 0 : subtotal * 0.21;
   const total = subtotal + iva;
 
@@ -276,42 +282,44 @@ export function RemitoDocument({ shipment }: RemitoDocumentProps) {
           <div className="bg-neutral-100 px-2 py-1.5 border-b border-neutral-300">
             <p className="text-[9px] font-bold uppercase tracking-wide">Servicios</p>
           </div>
-          <div className="p-2 space-y-1 text-[11px]">
-            <div className="flex justify-between">
-              <span>1. Flete</span>
-              <span className="font-mono font-medium">{formatCurrency(quotation.base_price)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>2. Seguro</span>
-              <span className="font-mono font-medium">{formatCurrency(quotation.insurance_cost)}</span>
-            </div>
-            {quotation.pickup_cost && quotation.pickup_cost > 0 && (
+          {hasQuotation ? (
+            <div className="p-2 space-y-1 text-[11px]">
               <div className="flex justify-between">
-                <span>3. Retiro</span>
-                <span className="font-mono font-medium">{formatCurrency(quotation.pickup_cost)}</span>
+                <span>1. Flete</span>
+                <span className="font-mono font-medium">{formatCurrency(quotation.base_price)}</span>
               </div>
-            )}
-            {quotation.delivery_cost && quotation.delivery_cost > 0 && (
               <div className="flex justify-between">
-                <span>4. Entrega</span>
-                <span className="font-mono font-medium">{formatCurrency(quotation.delivery_cost)}</span>
+                <span>2. Seguro</span>
+                <span className="font-mono font-medium">{formatCurrency(quotation.insurance_cost)}</span>
               </div>
-            )}
-            <div className="border-t border-neutral-200 pt-1.5 mt-1.5 space-y-0.5">
-              <div className="flex justify-between text-neutral-500 text-[10px]">
-                <span>Subtotal</span>
-                <span className="font-mono">{formatCurrency(subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-neutral-500 text-[10px]">
-                <span>IVA 21%</span>
-                <span className="font-mono">{formatCurrency(iva)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-sm pt-1 border-t border-neutral-200">
-                <span>TOTAL</span>
-                <span className="font-mono">{formatCurrency(total)}</span>
+              <div className="border-t border-neutral-200 pt-1.5 mt-1.5 space-y-0.5">
+                <div className="flex justify-between text-neutral-500 text-[10px]">
+                  <span>Subtotal</span>
+                  <span className="font-mono">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-neutral-500 text-[10px]">
+                  <span>IVA 21%</span>
+                  <span className="font-mono">{formatCurrency(iva)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-sm pt-1 border-t border-neutral-200">
+                  <span>TOTAL</span>
+                  <span className="font-mono">{formatCurrency(total)}</span>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-2 text-[11px]">
+              <div className="flex items-center justify-center h-16 text-neutral-400 italic">
+                Cotización pendiente
+              </div>
+              <div className="border-t border-neutral-200 pt-1.5 mt-1.5">
+                <div className="flex justify-between font-bold text-sm">
+                  <span>TOTAL</span>
+                  <span className="font-mono text-neutral-400">A cotizar</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Contenido */}

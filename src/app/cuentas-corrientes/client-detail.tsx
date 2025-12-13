@@ -45,6 +45,7 @@ interface Shipment {
   weight_kg: number | null;
   declared_value: number | null;
   calculated_amount: number;
+  quotation_id: string | null;
 }
 
 interface Settlement {
@@ -113,31 +114,46 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
           package_quantity,
           weight_kg,
           declared_value,
+          quotation_id,
           recipient:mercure_entities!recipient_id(legal_name)
         `)
         .eq('sender_id', clientId)
         .eq('status', 'rendida')
         .order('created_at', { ascending: false });
 
-      const mappedShipments: Shipment[] = (shipmentsData || []).map(s => {
-        const recipientData = s.recipient as { legal_name: string } | { legal_name: string }[] | null;
-        const recipient = Array.isArray(recipientData) ? recipientData[0] : recipientData;
-        const declaredValue = s.declared_value || 0;
-        const calculatedAmount = (declaredValue * 0.05) + (declaredValue * 0.008);
+      // Cargar precios de cotizaciones asociadas
+      const mappedShipments: Shipment[] = await Promise.all(
+        (shipmentsData || []).map(async (s) => {
+          const recipientData = s.recipient as { legal_name: string } | { legal_name: string }[] | null;
+          const recipient = Array.isArray(recipientData) ? recipientData[0] : recipientData;
+          const declaredValue = s.declared_value || 0;
+          
+          // Buscar precio de la cotización asociada
+          let calculatedAmount = 0;
+          if (s.quotation_id) {
+            const { data: quotation } = await supabase
+              .from('mercure_quotations')
+              .select('total_price')
+              .eq('id', s.quotation_id)
+              .single();
+            calculatedAmount = quotation?.total_price || 0;
+          }
 
-        return {
-          id: s.id,
-          delivery_note_number: s.delivery_note_number,
-          created_at: s.created_at,
-          recipient_name: recipient?.legal_name || '-',
-          origin: 'LANUS',
-          destination: 'SALTA',
-          package_quantity: s.package_quantity,
-          weight_kg: s.weight_kg,
-          declared_value: declaredValue,
-          calculated_amount: calculatedAmount,
-        };
-      });
+          return {
+            id: s.id,
+            delivery_note_number: s.delivery_note_number,
+            created_at: s.created_at,
+            recipient_name: recipient?.legal_name || '-',
+            origin: 'LANUS',
+            destination: 'SALTA',
+            package_quantity: s.package_quantity,
+            weight_kg: s.weight_kg,
+            declared_value: declaredValue,
+            calculated_amount: calculatedAmount,
+            quotation_id: s.quotation_id,
+          };
+        })
+      );
 
       setShipments(mappedShipments);
       setSelectedShipments(new Set(mappedShipments.map(s => s.id)));
@@ -184,8 +200,28 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
     try {
       const selectedShipmentsData = shipments.filter(s => selectedShipments.has(s.id));
       
-      const subtotalFlete = selectedShipmentsData.reduce((acc, s) => acc + (s.declared_value || 0) * 0.05, 0);
-      const subtotalSeguro = selectedShipmentsData.reduce((acc, s) => acc + (s.declared_value || 0) * 0.008, 0);
+      // Cargar cotizaciones para obtener desglose de flete y seguro
+      const shipmentsWithQuotations = await Promise.all(
+        selectedShipmentsData.map(async (s) => {
+          let fleteAmount = 0;
+          let seguroAmount = 0;
+          
+          if (s.quotation_id) {
+            const { data: quotation } = await supabase
+              .from('mercure_quotations')
+              .select('base_price, insurance_cost')
+              .eq('id', s.quotation_id)
+              .single();
+            fleteAmount = quotation?.base_price || 0;
+            seguroAmount = quotation?.insurance_cost || 0;
+          }
+          
+          return { ...s, fleteAmount, seguroAmount };
+        })
+      );
+      
+      const subtotalFlete = shipmentsWithQuotations.reduce((acc, s) => acc + s.fleteAmount, 0);
+      const subtotalSeguro = shipmentsWithQuotations.reduce((acc, s) => acc + s.seguroAmount, 0);
       const subtotal = subtotalFlete + subtotalSeguro;
       const iva = subtotal * 0.21;
       const total = subtotal + iva;
@@ -217,7 +253,7 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
 
       if (error) throw error;
 
-      const items = selectedShipmentsData.map((s, index) => ({
+      const items = shipmentsWithQuotations.map((s, index) => ({
         settlement_id: settlement.id,
         shipment_id: s.id,
         delivery_note_number: s.delivery_note_number || `#${s.id}`,
@@ -227,8 +263,8 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
         destination: s.destination,
         package_quantity: s.package_quantity,
         weight_kg: s.weight_kg,
-        flete_amount: (s.declared_value || 0) * 0.05,
-        seguro_amount: (s.declared_value || 0) * 0.008,
+        flete_amount: s.fleteAmount,
+        seguro_amount: s.seguroAmount,
         total_amount: s.calculated_amount,
         sort_order: index,
       }));

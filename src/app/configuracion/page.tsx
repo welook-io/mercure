@@ -2,10 +2,9 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
 import { supabaseAdmin } from "@/lib/supabase";
-import { isSuperAdmin, SUPER_ADMIN_DOMAIN, ALL_PERMISSIONS } from "@/lib/permissions";
+import { isSuperAdmin, SUPER_ADMIN_DOMAIN } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
-import { PermissionsMatrix } from "./permissions-matrix";
-import { AddUserForm } from "./add-user-form";
+import { ConfigTabs } from "./config-tabs";
 
 interface UserWithPermissions {
   id: string;
@@ -22,6 +21,22 @@ interface UserBasic {
   full_name: string | null;
   image_url: string | null;
   is_kalia: boolean;
+}
+
+interface AuditLog {
+  id: number;
+  user_id: string | null;
+  user_email: string | null;
+  user_name: string | null;
+  action: string;
+  module: string;
+  description: string;
+  target_type: string | null;
+  target_id: string | null;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 // Obtener usuarios con permisos asignados
@@ -100,15 +115,10 @@ async function getAvailableUsers(excludeIds: string[]): Promise<UserBasic[]> {
   }
   
   try {
-    let query = supabaseAdmin
+    const query = supabaseAdmin
       .from("users")
       .select("id, email, name, avatar_url")
       .order("created_at", { ascending: false });
-
-    // Excluir usuarios que ya tienen permisos
-    if (excludeIds.length > 0) {
-      // Supabase no soporta NOT IN directamente, hacemos el filtrado en memoria
-    }
 
     const { data: usersData, error } = await query;
 
@@ -132,6 +142,32 @@ async function getAvailableUsers(excludeIds: string[]): Promise<UserBasic[]> {
 
   } catch (e) {
     console.error("Error in getAvailableUsers:", e);
+    return [];
+  }
+}
+
+// Obtener logs de auditoría
+async function getAuditLogs(limit = 1000): Promise<AuditLog[]> {
+  if (!supabaseAdmin) {
+    console.error("supabaseAdmin not configured");
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("mercure_audit_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error("Error fetching audit logs:", error);
+      return [];
+    }
+
+    return data || [];
+  } catch (e) {
+    console.error("Error in getAuditLogs:", e);
     return [];
   }
 }
@@ -174,8 +210,11 @@ export default async function ConfiguracionPage() {
     }
   }
 
-  // Obtener usuarios con permisos
-  const usersWithPermissions = await getUsersWithPermissions();
+  // Obtener datos en paralelo
+  const [usersWithPermissions, auditLogs] = await Promise.all([
+    getUsersWithPermissions(),
+    getAuditLogs(),
+  ]);
   
   // Obtener usuarios disponibles para agregar (solo para super admins)
   const existingUserIds = usersWithPermissions.map(u => u.id);
@@ -187,42 +226,22 @@ export default async function ConfiguracionPage() {
       <main className="pt-12">
         <div className="px-3 sm:px-4 py-4 max-w-7xl">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-200 pb-3 mb-4 gap-2">
-            <div>
-              <h1 className="text-lg font-medium text-neutral-900">Configuración</h1>
-              <p className="text-xs text-neutral-500 mt-0.5">Gestión de permisos por usuario</p>
-            </div>
+          <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
+            <h1 className="text-lg font-medium text-neutral-900">Configuración</h1>
             {isSuper && (
-              <Badge variant="success" className="text-xs self-start sm:self-auto">
+              <Badge variant="success" className="text-xs">
                 Super Admin
               </Badge>
             )}
           </div>
 
-          {/* Panel Super Admin - Agregar usuarios */}
-          {isSuper && (
-            <div className="mb-6">
-              <AddUserForm availableUsers={availableUsers} />
-            </div>
-          )}
-
-          {/* Matriz de permisos */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
-                Matriz de Permisos ({usersWithPermissions.length} usuarios)
-              </h2>
-            </div>
-
-            <PermissionsMatrix users={usersWithPermissions} />
-          </div>
-
-          {/* Info */}
-          <div className="mt-6 bg-neutral-50 border border-neutral-200 rounded p-3">
-            <p className="text-xs text-neutral-500">
-              Los permisos se aplican individualmente por usuario. Cada toggle controla el acceso a un módulo específico.
-            </p>
-          </div>
+          {/* Tabs */}
+          <ConfigTabs
+            usersWithPermissions={usersWithPermissions}
+            availableUsers={availableUsers}
+            auditLogs={auditLogs}
+            isSuper={isSuper}
+          />
         </div>
       </main>
     </div>

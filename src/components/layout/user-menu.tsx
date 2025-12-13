@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, Settings } from "lucide-react";
 import { useUserProfile } from "@/lib/hooks/use-user-profile";
 import { isSuperAdmin } from "@/lib/permissions";
@@ -22,8 +22,8 @@ export function UserMenu() {
 
   if (!user) return null;
 
-  const initials = user.firstName && user.lastName 
-    ? `${user.firstName[0]}${user.lastName[0]}`
+  const initials = user.firstName 
+    ? user.firstName[0].toUpperCase()
     : user.emailAddresses[0]?.emailAddress?.[0]?.toUpperCase() || "U";
 
   const userEmail = user.emailAddresses[0]?.emailAddress;
@@ -49,15 +49,14 @@ export function UserMenu() {
             </p>
           </div>
           <div className="relative">
-            <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent group-hover:ring-neutral-600 transition-all">
-              <AvatarImage src={user.imageUrl} alt={displayName} />
-              <AvatarFallback className="bg-neutral-700 text-white text-xs font-medium">
+            <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-transparent group-hover:ring-zinc-600 transition-all">
+              <AvatarFallback className="bg-zinc-700 text-zinc-300 text-sm font-medium">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            {(activePermissions > 0 || isSuper) && (
-              <span className={`absolute -bottom-1 -right-1 text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none ${isSuper ? 'bg-orange-500' : 'bg-neutral-600'}`}>
-                {isSuper ? "★" : activePermissions}
+            {isSuper && (
+              <span className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-[9px] font-medium px-1 py-0.5 rounded-full leading-none">
+                ★
               </span>
             )}
           </div>

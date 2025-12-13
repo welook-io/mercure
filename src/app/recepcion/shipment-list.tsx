@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { SHIPMENT_STATUS_LABELS } from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
-import { ChevronDown, Package } from "lucide-react";
+import { ChevronDown, Package, FileText, Pencil, Printer } from "lucide-react";
+import Link from "next/link";
 
 type Shipment = {
   id: number;
@@ -120,6 +121,24 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
                     })}</p>
                   </div>
                 </div>
+                
+                {/* Acciones */}
+                <div className="flex gap-2 mt-3 pt-3 border-t border-neutral-200">
+                  <Link 
+                    href={`/envios/${s.id}/remito`}
+                    className="flex-1 h-8 px-3 text-xs bg-neutral-900 hover:bg-neutral-800 text-white rounded flex items-center justify-center gap-1.5"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Ver Remito
+                  </Link>
+                  <Link 
+                    href={`/envios/${s.id}/editar`}
+                    className="flex-1 h-8 px-3 text-xs border border-neutral-200 hover:bg-neutral-50 rounded flex items-center justify-center gap-1.5"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Modificar
+                  </Link>
+                </div>
               </div>
             )}
           </div>
@@ -137,10 +156,10 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Destinatario</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Bultos</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Kg</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">M³</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Valor</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Estado</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Ingreso</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-neutral-500 uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -151,7 +170,6 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
                   <td className="px-3 py-2 text-neutral-600 truncate max-w-[120px]">{s.recipient?.legal_name || '-'}</td>
                   <td className="px-3 py-2 text-right text-neutral-600">{s.package_quantity || '-'}</td>
                   <td className="px-3 py-2 text-right text-neutral-600">{s.weight_kg || '-'}</td>
-                  <td className="px-3 py-2 text-right text-neutral-600">{s.volume_m3 || '-'}</td>
                   <td className="px-3 py-2 text-right text-neutral-600">{s.declared_value ? `$${s.declared_value.toLocaleString('es-AR')}` : '-'}</td>
                   <td className="px-3 py-2">
                     <Badge variant={getStatusVariant(s.status)}>
@@ -159,6 +177,24 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
                     </Badge>
                   </td>
                   <td className="px-3 py-2 text-neutral-400 text-xs">{timeAgo(s.created_at)}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center justify-center gap-1">
+                      <Link 
+                        href={`/envios/${s.id}/remito`}
+                        className="p-1.5 hover:bg-neutral-100 rounded text-neutral-600 hover:text-neutral-900"
+                        title="Ver Remito"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </Link>
+                      <Link 
+                        href={`/envios/${s.id}/editar`}
+                        className="p-1.5 hover:bg-neutral-100 rounded text-neutral-600 hover:text-neutral-900"
+                        title="Modificar"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

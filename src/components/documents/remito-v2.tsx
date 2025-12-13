@@ -7,9 +7,6 @@ interface QuotationData {
   insurance_cost: number;
   total_price: number;
   includes_iva: boolean;
-  pickup_cost?: number;
-  delivery_cost?: number;
-  storage_cost?: number;
 }
 
 interface ShipmentData {
@@ -85,12 +82,23 @@ export function RemitoDocumentV2({ shipment }: RemitoDocumentProps) {
   const dateStr = formatDate(shipment.created_at);
   const isCtaCte = shipment.payment_terms === 'cuenta_corriente';
 
-  const quotation: QuotationData = shipment.quotation || {
-    base_price: Number(shipment.weight_kg) * 180,
-    insurance_cost: Number(shipment.declared_value) * 0.008,
+  // Costos - Si no hay cotización, mostrar "Pendiente de cotizar"
+  // NUNCA usar fórmulas hardcodeadas - el precio real viene de la cotización
+  // Nota: Los campos numeric de Supabase pueden llegar como strings, hay que parsearlos
+  const rawQuotation = shipment.quotation;
+  const quotation: QuotationData = rawQuotation ? {
+    base_price: Number(rawQuotation.base_price) || 0,
+    insurance_cost: Number(rawQuotation.insurance_cost) || 0,
+    total_price: Number(rawQuotation.total_price) || 0,
+    includes_iva: rawQuotation.includes_iva || false,
+  } : {
+    base_price: 0,
+    insurance_cost: 0,
     total_price: 0,
     includes_iva: false,
   };
+  
+  const hasQuotation = !!rawQuotation && quotation.total_price > 0;
 
   const subtotal = quotation.base_price + quotation.insurance_cost;
   const iva = subtotal * 0.21;
@@ -176,28 +184,29 @@ export function RemitoDocumentV2({ shipment }: RemitoDocumentProps) {
       {/* ══════════════════════════════════════════════════════════════
           MÉTRICAS - Diseño dashboard
       ══════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-5 gap-3 mb-6">
-        <div className="bg-neutral-900 text-white rounded-lg p-3 text-center">
+      <div className="flex gap-2 mb-6">
+        <div className="bg-neutral-900 text-white rounded-lg p-3 text-center w-16 shrink-0">
           <p className="text-[9px] uppercase tracking-wider opacity-60 mb-1">Bultos</p>
-          <p className="text-3xl font-black">{shipment.package_quantity}</p>
+          <p className="text-2xl font-black">{shipment.package_quantity}</p>
         </div>
-        <div className="bg-neutral-100 rounded-lg p-3 text-center">
+        <div className="bg-neutral-100 rounded-lg p-3 text-center flex-1 min-w-0">
           <p className="text-[9px] uppercase tracking-wider text-neutral-500 mb-1">Peso</p>
-          <p className="text-xl font-bold font-mono">{formatNumber(Number(shipment.weight_kg))}</p>
+          <p className="text-lg font-bold font-mono">{formatNumber(Number(shipment.weight_kg))}</p>
           <p className="text-[9px] text-neutral-400">kg</p>
         </div>
-        <div className="bg-neutral-100 rounded-lg p-3 text-center">
+        <div className="bg-neutral-100 rounded-lg p-3 text-center flex-1 min-w-0">
           <p className="text-[9px] uppercase tracking-wider text-neutral-500 mb-1">Volumen</p>
-          <p className="text-xl font-bold font-mono">{shipment.volume_m3 ? formatNumber(Number(shipment.volume_m3), 2) : '-'}</p>
+          <p className="text-lg font-bold font-mono">{shipment.volume_m3 ? formatNumber(Number(shipment.volume_m3), 2) : '-'}</p>
           <p className="text-[9px] text-neutral-400">m³</p>
         </div>
-        <div className="bg-neutral-100 rounded-lg p-3 text-center">
+        <div className="border-2 border-neutral-900 rounded-lg p-3 text-center flex-[1.8] min-w-0">
           <p className="text-[9px] uppercase tracking-wider text-neutral-500 mb-1">Valor Decl.</p>
-          <p className="text-sm font-bold font-mono">{formatCurrency(shipment.declared_value)}</p>
+          <p className="text-lg font-bold font-mono">{formatCurrency(shipment.declared_value)}</p>
+          <p className="text-[9px] text-neutral-400">ARS</p>
         </div>
-        <div className="bg-orange-500 text-white rounded-lg p-3 text-center">
-          <p className="text-[9px] uppercase tracking-wider opacity-80 mb-1">Pago</p>
-          <p className="text-lg font-black uppercase">{shipment.paid_by || 'Destino'}</p>
+        <div className="bg-neutral-900 text-white rounded-lg p-3 text-center w-24 shrink-0">
+          <p className="text-[9px] uppercase tracking-wider opacity-60 mb-1">Pago</p>
+          <p className="text-sm font-black uppercase">{shipment.paid_by || 'Destino'}</p>
         </div>
       </div>
 
@@ -209,30 +218,42 @@ export function RemitoDocumentV2({ shipment }: RemitoDocumentProps) {
           {/* Costos */}
           <div className="p-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 mb-2">Detalle Flete</p>
-            <div className="space-y-1.5 text-[11px]">
-              <div className="flex justify-between">
-                <span>Flete</span>
-                <span className="font-mono">{formatCurrency(quotation.base_price)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Seguro</span>
-                <span className="font-mono">{formatCurrency(quotation.insurance_cost)}</span>
-              </div>
-              <div className="border-t border-neutral-100 pt-1.5 mt-1.5">
-                <div className="flex justify-between text-neutral-500 text-[10px]">
-                  <span>Subtotal</span>
-                  <span className="font-mono">{formatCurrency(subtotal)}</span>
+            {hasQuotation ? (
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex justify-between">
+                  <span>Flete</span>
+                  <span className="font-mono">{formatCurrency(quotation.base_price)}</span>
                 </div>
-                <div className="flex justify-between text-neutral-500 text-[10px]">
-                  <span>IVA 21%</span>
-                  <span className="font-mono">{formatCurrency(iva)}</span>
+                <div className="flex justify-between">
+                  <span>Seguro</span>
+                  <span className="font-mono">{formatCurrency(quotation.insurance_cost)}</span>
+                </div>
+                <div className="border-t border-neutral-100 pt-1.5 mt-1.5">
+                  <div className="flex justify-between text-neutral-500 text-[10px]">
+                    <span>Subtotal</span>
+                    <span className="font-mono">{formatCurrency(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-neutral-500 text-[10px]">
+                    <span>IVA 21%</span>
+                    <span className="font-mono">{formatCurrency(iva)}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between font-bold text-sm pt-1 border-t border-neutral-200">
+                  <span>TOTAL</span>
+                  <span className="font-mono">{formatCurrency(total)}</span>
                 </div>
               </div>
-              <div className="flex justify-between font-bold text-sm pt-1 border-t border-neutral-200">
-                <span>TOTAL</span>
-                <span className="font-mono">{formatCurrency(total)}</span>
+            ) : (
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex items-center justify-center h-12 text-neutral-400 italic">
+                  Cotización pendiente
+                </div>
+                <div className="flex justify-between font-bold text-sm pt-1 border-t border-neutral-200">
+                  <span>TOTAL</span>
+                  <span className="font-mono text-neutral-400">A cotizar</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Contenido */}

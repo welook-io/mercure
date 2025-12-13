@@ -6,7 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Calculator } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles, CheckCircle2, AlertCircle, Calculator, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { ImageCapture, CapturedImage } from "./image-capture";
 
@@ -149,6 +149,7 @@ function NuevaRecepcionContent() {
   }
   const [pricingInfo, setPricingInfo] = useState<PricingInfo | null>(null);
   const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  const [showFormulaDetails, setShowFormulaDetails] = useState(false);
   
   // Campos que necesitan confirmación
   const [pendingFields, setPendingFields] = useState<PendingFields>({
@@ -946,15 +947,27 @@ function NuevaRecepcionContent() {
                 <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
                   Condiciones de Pago
                 </span>
-                {calculatedPrice && calculatedPrice > 0 && (
-                  <span className="text-lg font-bold text-neutral-900">
-                    ${calculatedPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  {pricingInfo && pricingInfo.pricing.breakdown && (
+                    <button
+                      type="button"
+                      onClick={() => setShowFormulaDetails(!showFormulaDetails)}
+                      className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                    >
+                      {showFormulaDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                      Ver fórmula
+                    </button>
+                  )}
+                  {calculatedPrice && calculatedPrice > 0 && (
+                    <span className="text-lg font-bold text-neutral-900">
+                      ${calculatedPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
               </div>
               
-              {/* Detalle del cálculo de pricing */}
-              {pricingInfo && pricingInfo.pricing.breakdown && (
+              {/* Detalle del cálculo de pricing (colapsable) */}
+              {showFormulaDetails && pricingInfo && pricingInfo.pricing.breakdown && (
                 <div className="px-3 py-2 bg-neutral-100 border-b border-neutral-200 text-xs overflow-x-auto">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
                     {/* Columna izquierda: Datos de carga */}
@@ -1008,7 +1021,7 @@ function NuevaRecepcionContent() {
                   
                   {/* Nota sobre tarifa aplicada */}
                   {pricingInfo.commercialTerms && (
-                    <div className="mt-2 pt-2 border-t border-neutral-300 text-neutral-500 flex gap-4">
+                    <div className="mt-2 pt-2 border-t border-neutral-300 text-neutral-500 flex flex-wrap gap-x-4 gap-y-1">
                       <span>Tarifa: {pricingInfo.commercialTerms.tariffType}</span>
                       {pricingInfo.commercialTerms.tariffModifier !== 0 && (
                         <span className={pricingInfo.commercialTerms.tariffModifier < 0 ? 'text-green-700' : 'text-red-600'}>
@@ -1021,45 +1034,69 @@ function NuevaRecepcionContent() {
                 </div>
               )}
 
-              <div className="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="p-3 space-y-3">
+                {/* Switch de quién paga */}
                 <div>
-                  <Label className="text-xs mb-1 block">Pagadero por</Label>
-                  <select
-                    name="paidBy"
-                    value={formData.paidBy}
-                    onChange={(e) => setFormData(prev => ({ ...prev, paidBy: e.target.value as 'origen' | 'destino' }))}
-                    className="h-8 w-full px-2 text-sm border border-neutral-200 rounded bg-white focus:border-neutral-400 focus:outline-none"
-                  >
-                    <option value="destino">Destino (Cliente)</option>
-                    <option value="origen">Origen (Remitente)</option>
-                  </select>
-                </div>
-                <div>
-                  <Label className="text-xs mb-1 block">Condición</Label>
-                  <select
-                    name="paymentTerms"
-                    value={formData.paymentTerms}
-                    onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                    className="h-8 w-full px-2 text-sm border border-neutral-200 rounded bg-white focus:border-neutral-400 focus:outline-none"
-                  >
-                    <option value="contado">Contado (Contra entrega)</option>
-                    <option value="cuenta_corriente">Cuenta Corriente</option>
-                  </select>
-                </div>
-                {formData.paymentTerms === 'contado' && calculatedPrice && (
-                  <div className="flex items-end">
-                    <div className="px-3 py-1.5 bg-orange-500 text-white rounded text-sm font-bold">
-                      COBRAR: ${calculatedPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </div>
+                  <Label className="text-xs mb-2 block">¿Quién paga el flete?</Label>
+                  <div className="inline-flex rounded-md border border-neutral-200 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, paidBy: 'origen' }))}
+                      className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        formData.paidBy === 'origen'
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-white text-neutral-600 hover:bg-neutral-50'
+                      }`}
+                    >
+                      Remitente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, paidBy: 'destino' }))}
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-l border-neutral-200 ${
+                        formData.paidBy === 'destino'
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-white text-neutral-600 hover:bg-neutral-50'
+                      }`}
+                    >
+                      Destinatario
+                    </button>
                   </div>
-                )}
-                {pricingInfo?.path === 'A' && (
-                  <div className="flex items-end">
-                    <div className="px-3 py-1.5 bg-green-100 border border-green-200 rounded text-xs text-green-800">
-                      Facturar a fin de mes (Cta Cte)
-                    </div>
+                  <p className="text-[10px] text-neutral-400 mt-1">
+                    {formData.paidBy === 'origen' 
+                      ? '→ El remitente abona en origen' 
+                      : '→ El destinatario abona al recibir'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs mb-1 block">Condición</Label>
+                    <select
+                      name="paymentTerms"
+                      value={formData.paymentTerms}
+                      onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                      className="h-8 w-full px-2 text-sm border border-neutral-200 rounded bg-white focus:border-neutral-400 focus:outline-none"
+                    >
+                      <option value="contado">Contado (Contra entrega)</option>
+                      <option value="cuenta_corriente">Cuenta Corriente</option>
+                    </select>
                   </div>
-                )}
+                  {formData.paymentTerms === 'contado' && calculatedPrice && (
+                    <div className="flex items-end">
+                      <div className="px-3 py-1.5 bg-orange-500 text-white rounded text-sm font-bold">
+                        COBRAR: ${calculatedPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  )}
+                  {pricingInfo?.path === 'A' && (
+                    <div className="flex items-end">
+                      <div className="px-3 py-1.5 bg-green-100 border border-green-200 rounded text-xs text-green-800">
+                        Facturar a fin de mes (Cta Cte)
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Descripción de la carga */}

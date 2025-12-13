@@ -122,6 +122,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
 export const ROUTE_PERMISSIONS: Record<string, Permission> = {
   "/": "dashboard",
   "/operaciones/centros": "centros",
+  "/operaciones/kanban": "procesos",
   "/recepcion": "recepcion",
   "/consolidacion": "consolidacion",
   "/envios": "envios",

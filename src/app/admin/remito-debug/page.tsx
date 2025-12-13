@@ -1,22 +1,32 @@
 import { requireAuth } from "@/lib/auth";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { RemitoPreview } from "./remito-preview";
 
 async function getShipmentData() {
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin no disponible');
+    return null;
+  }
+  
   // Obtener el envío de HIPERPLACA para debug
-  const { data: shipment } = await supabase
+  const { data: shipment, error: shipmentError } = await supabaseAdmin
     .from('mercure_shipments')
     .select('*')
     .eq('id', 10)
     .single();
 
-  // Obtener sender y recipient por separado
+  if (shipmentError) {
+    console.error('Error cargando shipment:', shipmentError);
+  }
+
+  // Obtener sender, recipient y quotation por separado
   let sender = null;
   let recipient = null;
+  let quotation = null;
 
   if (shipment?.sender_id) {
-    const { data } = await supabase
+    const { data } = await supabaseAdmin
       .from('mercure_entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.sender_id)
@@ -25,12 +35,27 @@ async function getShipmentData() {
   }
 
   if (shipment?.recipient_id) {
-    const { data } = await supabase
+    const { data } = await supabaseAdmin
       .from('mercure_entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.recipient_id)
       .single();
     recipient = data;
+  }
+
+  // Cargar cotización asociada
+  if (shipment?.quotation_id) {
+    const { data, error: quotationError } = await supabaseAdmin
+      .from('mercure_quotations')
+      .select('base_price, insurance_cost, total_price, includes_iva')
+      .eq('id', shipment.quotation_id)
+      .single();
+    
+    if (quotationError) {
+      console.error('Error cargando quotation:', quotationError);
+    }
+    quotation = data;
+    console.log('Quotation cargada:', quotation);
   }
 
   if (!shipment) {
@@ -60,6 +85,12 @@ async function getShipmentData() {
       load_description: "1 pallet con perfiles de aluminio y accesorios para placards",
       paid_by: "destino",
       payment_terms: "contado",
+      quotation: {
+        base_price: 51113.18,
+        insurance_cost: 16127.63,
+        total_price: 67240.81,
+        includes_iva: false,
+      },
     };
   }
 
@@ -67,6 +98,7 @@ async function getShipmentData() {
     ...shipment,
     sender,
     recipient,
+    quotation,
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useOptimistic } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { 
   PERMISSION_CATEGORIES, 
   PERMISSION_LABELS, 
@@ -155,8 +156,122 @@ function UserRow({
   );
 }
 
+// Card de usuario para vista mobile
+function UserCard({ 
+  user, 
+  onRemove,
+  isExpanded,
+  onToggle,
+}: { 
+  user: User; 
+  onRemove: (userId: string, email: string) => void;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const hasAnyPermission = ALL_PERMISSIONS.some(p => user.permissions[p]);
+  const activePermissionsCount = ALL_PERMISSIONS.filter(p => user.permissions[p]).length;
+
+  const handleRemove = () => {
+    if (confirm(`¿Quitar todos los permisos de ${user.email}?`)) {
+      startTransition(() => {
+        onRemove(user.id, user.email);
+      });
+    }
+  };
+
+  return (
+    <div className="border border-neutral-200 rounded bg-white">
+      {/* Header */}
+      <button
+        onClick={onToggle}
+        className="w-full px-3 py-3 flex items-center justify-between hover:bg-neutral-50"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {user.image_url ? (
+            <img 
+              src={user.image_url} 
+              alt={user.full_name || user.email}
+              className="w-8 h-8 rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-medium text-neutral-600 shrink-0">
+              {getInitials(user.full_name, user.email)}
+            </div>
+          )}
+          <div className="min-w-0 text-left">
+            <div className="font-medium text-neutral-900 text-sm truncate flex items-center gap-1">
+              {user.full_name || user.email?.split("@")[0]}
+              {user.is_kalia && <span className="text-orange-500 text-xs">★</span>}
+            </div>
+            <div className="text-xs text-neutral-400 truncate">
+              {user.email}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">
+            {activePermissionsCount} permisos
+          </span>
+          {isExpanded ? (
+            <ChevronUp className="w-4 h-4 text-neutral-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-neutral-400" />
+          )}
+        </div>
+      </button>
+
+      {/* Permisos expandidos */}
+      {isExpanded && (
+        <div className="border-t border-neutral-200 px-3 py-3 space-y-4">
+          {Object.entries(PERMISSION_CATEGORIES).map(([catKey, category]) => (
+            <div key={catKey}>
+              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
+                {category.label}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {category.permissions.map((permission) => (
+                  <label 
+                    key={permission}
+                    className="flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <PermissionCheckbox
+                      userId={user.id}
+                      permission={permission as Permission}
+                      initialValue={user.permissions[permission] || false}
+                      disabled={user.is_kalia}
+                    />
+                    <span className={user.permissions[permission] ? "text-neutral-900" : "text-neutral-400"}>
+                      {PERMISSION_LABELS[permission]}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Botón eliminar */}
+          {!user.is_kalia && hasAnyPermission && (
+            <div className="pt-2 border-t border-neutral-100">
+              <button
+                onClick={handleRemove}
+                disabled={isPending}
+                className="text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                <X className="w-3 h-3" />
+                Quitar todos los permisos
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PermissionsMatrix({ users }: PermissionsMatrixProps) {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   const handleRemove = async (userId: string, email: string) => {
     const result = await removeUserFromOrg(userId, email);
@@ -181,8 +296,27 @@ export function PermissionsMatrix({ users }: PermissionsMatrixProps) {
         </div>
       )}
 
-      {/* Matriz */}
-      <div className="border border-neutral-200 rounded overflow-hidden">
+      {/* Vista Mobile - Cards */}
+      <div className="md:hidden space-y-2">
+        {users.length === 0 ? (
+          <div className="text-center text-neutral-400 py-8 text-sm">
+            No hay usuarios con permisos asignados
+          </div>
+        ) : (
+          users.map((user) => (
+            <UserCard 
+              key={user.id} 
+              user={user} 
+              onRemove={handleRemove}
+              isExpanded={expandedUserId === user.id}
+              onToggle={() => setExpandedUserId(expandedUserId === user.id ? null : user.id)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Vista Desktop - Matriz */}
+      <div className="hidden md:block border border-neutral-200 rounded overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -266,8 +400,8 @@ export function PermissionsMatrix({ users }: PermissionsMatrixProps) {
         </div>
       </div>
 
-      {/* Leyenda compacta */}
-      <div className="text-[10px] text-neutral-500 space-y-1">
+      {/* Leyenda compacta - solo desktop */}
+      <div className="hidden md:block text-[10px] text-neutral-500 space-y-1">
         {Object.entries(PERMISSION_CATEGORIES).map(([key, cat]) => (
           <div key={key}>
             <span className="font-semibold text-neutral-600">{cat.label}:</span>{" "}
