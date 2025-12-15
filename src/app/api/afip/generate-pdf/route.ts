@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
+import { jsPDF } from 'jspdf';
 
 // Datos del emisor (Mercure)
 const EMISOR = {
@@ -20,12 +19,10 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(dateStr: string): string {
-  // dateStr puede ser "20251222" o "2025-12-22"
   if (dateStr.includes('-')) {
     const [year, month, day] = dateStr.split('-');
     return `${day}/${month}/${year}`;
   }
-  // Formato YYYYMMDD
   const year = dateStr.slice(0, 4);
   const month = dateStr.slice(4, 6);
   const day = dateStr.slice(6, 8);
@@ -47,362 +44,180 @@ export async function GET(request: NextRequest) {
   
   const today = new Date();
   const fechaEmision = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
-  
-  // Generar datos para el QR de AFIP
-  const qrData = {
-    ver: 1,
-    fecha: today.toISOString().split('T')[0],
-    cuit: parseInt(EMISOR.cuit.replace(/-/g, '')),
-    ptoVta: parseInt(invoiceNumber.split('-')[0]),
-    tipoCmp: invoiceType === 'A' ? 1 : 6,
-    nroCmp: parseInt(invoiceNumber.split('-')[1]),
-    importe: total,
-    moneda: 'PES',
-    ctz: 1,
-    tipoDocRec: 80,
-    nroDocRec: parseInt(clienteCuit.replace(/-/g, '')),
-    tipoCodAut: 'E',
-    codAut: parseInt(cae),
-  };
-  
-  const qrBase64 = Buffer.from(JSON.stringify(qrData)).toString('base64');
-  const qrUrl = `https://www.afip.gob.ar/fe/qr/?p=${qrBase64}`;
-  
-  // Crear HTML del PDF optimizado para impresión
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Factura ${invoiceNumber}</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 15mm 20mm;
-    }
-    @media print {
-      html, body {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-      .no-print { display: none !important; }
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: 'Helvetica Neue', Arial, sans-serif; 
-      font-size: 11px; 
-      color: #333;
-      padding: 20px 30px;
-      max-width: 800px;
-      margin: 0 auto;
-      background: white;
-    }
-    .header { 
-      display: flex; 
-      border: 2px solid #333;
-      margin-bottom: 15px;
-    }
-    .header-left, .header-right { 
-      flex: 1; 
-      padding: 15px;
-    }
-    .header-center {
-      width: 80px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border-left: 2px solid #333;
-      border-right: 2px solid #333;
-      background: #f5f5f5;
-    }
-    .tipo-factura {
-      font-size: 48px;
-      font-weight: bold;
-      line-height: 1;
-    }
-    .codigo-tipo {
-      font-size: 10px;
-      margin-top: 5px;
-    }
-    .empresa-nombre {
-      font-size: 18px;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-    .empresa-datos {
-      font-size: 10px;
-      line-height: 1.4;
-    }
-    .factura-titulo {
-      font-size: 14px;
-      font-weight: bold;
-      text-align: right;
-      margin-bottom: 5px;
-    }
-    .factura-numero {
-      font-size: 16px;
-      font-weight: bold;
-      text-align: right;
-      margin-bottom: 10px;
-    }
-    .factura-fecha {
-      text-align: right;
-      font-size: 11px;
-    }
-    .cliente-box {
-      border: 1px solid #ccc;
-      padding: 12px;
-      margin-bottom: 15px;
-      background: #fafafa;
-    }
-    .cliente-titulo {
-      font-weight: bold;
-      margin-bottom: 8px;
-      font-size: 12px;
-      text-transform: uppercase;
-      color: #666;
-    }
-    .cliente-row {
-      display: flex;
-      margin-bottom: 4px;
-    }
-    .cliente-label {
-      width: 120px;
-      font-weight: 500;
-      color: #666;
-    }
-    .detalle-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 15px;
-    }
-    .detalle-table th {
-      background: #333;
-      color: white;
-      padding: 10px;
-      text-align: left;
-      font-size: 11px;
-      text-transform: uppercase;
-    }
-    .detalle-table td {
-      padding: 10px;
-      border-bottom: 1px solid #ddd;
-    }
-    .text-right {
-      text-align: right;
-    }
-    .totales-box {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: 20px;
-    }
-    .totales-content {
-      width: 280px;
-    }
-    .total-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      border-bottom: 1px solid #eee;
-    }
-    .total-row.grande {
-      font-size: 16px;
-      font-weight: bold;
-      border-top: 2px solid #333;
-      border-bottom: none;
-      padding-top: 10px;
-      margin-top: 5px;
-    }
-    .cae-box {
-      border: 2px solid #333;
-      padding: 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #f9f9f9;
-    }
-    .cae-info {
-      flex: 1;
-    }
-    .cae-titulo {
-      font-size: 12px;
-      font-weight: bold;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      color: #333;
-    }
-    .cae-numero {
-      font-size: 18px;
-      font-family: monospace;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-    .cae-vto {
-      font-size: 11px;
-      color: #666;
-    }
-    .qr-box {
-      width: 120px;
-      height: 120px;
-      border: 1px solid #ccc;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: white;
-    }
-    .qr-placeholder {
-      font-size: 10px;
-      text-align: center;
-      color: #999;
-      padding: 10px;
-    }
-    .footer {
-      margin-top: 20px;
-      text-align: center;
-      font-size: 9px;
-      color: #999;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="header-left">
-      <div class="empresa-nombre">${EMISOR.razonSocial}</div>
-      <div class="empresa-datos">
-        <div>${EMISOR.domicilio}</div>
-        <div>CUIT: ${EMISOR.cuit}</div>
-        <div>${EMISOR.condicionIva}</div>
-        <div>Inicio de Actividades: ${EMISOR.inicioActividades}</div>
-      </div>
-    </div>
-    <div class="header-center">
-      <div class="tipo-factura">${invoiceType}</div>
-      <div class="codigo-tipo">COD. ${invoiceType === 'A' ? '01' : '06'}</div>
-    </div>
-    <div class="header-right">
-      <div class="factura-titulo">FACTURA</div>
-      <div class="factura-numero">Nº ${invoiceNumber}</div>
-      <div class="factura-fecha">
-        <div>Fecha de Emisión: ${fechaEmision}</div>
-        <div>CUIT: ${EMISOR.cuit}</div>
-      </div>
-    </div>
-  </div>
-  
-  <div class="cliente-box">
-    <div class="cliente-titulo">Datos del Cliente</div>
-    <div class="cliente-row">
-      <span class="cliente-label">Razón Social:</span>
-      <span>${clienteNombre}</span>
-    </div>
-    <div class="cliente-row">
-      <span class="cliente-label">CUIT:</span>
-      <span>${clienteCuit}</span>
-    </div>
-    <div class="cliente-row">
-      <span class="cliente-label">Condición IVA:</span>
-      <span>IVA Responsable Inscripto</span>
-    </div>
-  </div>
-  
-  <table class="detalle-table">
-    <thead>
-      <tr>
-        <th style="width: 60%">Descripción</th>
-        <th class="text-right">Cantidad</th>
-        <th class="text-right">Precio Unit.</th>
-        <th class="text-right">Subtotal</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Servicios de flete</td>
-        <td class="text-right">1</td>
-        <td class="text-right">${formatCurrency(neto)}</td>
-        <td class="text-right">${formatCurrency(neto)}</td>
-      </tr>
-    </tbody>
-  </table>
-  
-  <div class="totales-box">
-    <div class="totales-content">
-      <div class="total-row">
-        <span>Subtotal Neto:</span>
-        <span>${formatCurrency(neto)}</span>
-      </div>
-      <div class="total-row">
-        <span>IVA 21%:</span>
-        <span>${formatCurrency(iva)}</span>
-      </div>
-      <div class="total-row grande">
-        <span>TOTAL:</span>
-        <span>${formatCurrency(total)}</span>
-      </div>
-    </div>
-  </div>
-  
-  <div class="cae-box">
-    <div class="cae-info">
-      <div class="cae-titulo">CAE (Código de Autorización Electrónico)</div>
-      <div class="cae-numero">${cae}</div>
-      <div class="cae-vto">Fecha de Vencimiento: ${formatDate(caeExpiration)}</div>
-    </div>
-    <div class="qr-box">
-      <div class="qr-placeholder">
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrUrl)}" width="100" height="100" alt="QR AFIP" />
-      </div>
-    </div>
-  </div>
-  
-  <div class="footer">
-    Comprobante autorizado - Verifique este comprobante en: www.afip.gob.ar/fe/qr/
-  </div>
-</body>
-</html>
-`;
 
-  // Generar PDF con Puppeteer + Chromium serverless
   try {
-    const executablePath = await chromium.executablePath();
-    
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: { width: 1200, height: 800 },
-      executablePath,
-      headless: true,
+    // Crear PDF con jsPDF
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
     });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    let y = 20;
+
+    // ===== HEADER =====
+    // Cuadro izquierdo - Datos empresa
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, 70, 40);
     
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(EMISOR.razonSocial, margin + 5, y + 10);
     
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '15mm',
-        bottom: '15mm',
-        left: '20mm',
-        right: '20mm',
-      },
-    });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(EMISOR.domicilio, margin + 5, y + 17, { maxWidth: 60 });
+    doc.text(`CUIT: ${EMISOR.cuit}`, margin + 5, y + 27);
+    doc.text(EMISOR.condicionIva, margin + 5, y + 32);
+    doc.text(`Inicio Act.: ${EMISOR.inicioActividades}`, margin + 5, y + 37);
+
+    // Cuadro centro - Tipo factura
+    doc.rect(margin + 70, y, 30, 40);
+    doc.setFillColor(245, 245, 245);
+    doc.rect(margin + 70, y, 30, 40, 'F');
+    doc.rect(margin + 70, y, 30, 40);
     
-    await browser.close();
+    doc.setFontSize(36);
+    doc.setFont('helvetica', 'bold');
+    doc.text(invoiceType, margin + 85, y + 25, { align: 'center' });
     
-    return new NextResponse(Buffer.from(pdfBuffer), {
+    doc.setFontSize(8);
+    doc.text(`COD. ${invoiceType === 'A' ? '01' : '06'}`, margin + 85, y + 35, { align: 'center' });
+
+    // Cuadro derecho - Número factura
+    doc.rect(margin + 100, y, 70, 40);
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FACTURA', margin + 135, y + 10, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.text(`Nº ${invoiceNumber}`, margin + 135, y + 20, { align: 'center' });
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Fecha: ${fechaEmision}`, margin + 135, y + 30, { align: 'center' });
+    doc.text(`CUIT: ${EMISOR.cuit}`, margin + 135, y + 36, { align: 'center' });
+
+    y += 50;
+
+    // ===== DATOS CLIENTE =====
+    doc.setFillColor(250, 250, 250);
+    doc.rect(margin, y, pageWidth - 2 * margin, 25, 'F');
+    doc.rect(margin, y, pageWidth - 2 * margin, 25);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DATOS DEL CLIENTE', margin + 5, y + 7);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Razón Social: ${clienteNombre}`, margin + 5, y + 14);
+    doc.text(`CUIT: ${clienteCuit}`, margin + 5, y + 20);
+    doc.text('Condición IVA: IVA Responsable Inscripto', margin + 100, y + 14);
+
+    y += 35;
+
+    // ===== TABLA DETALLE =====
+    // Header tabla
+    doc.setFillColor(51, 51, 51);
+    doc.rect(margin, y, pageWidth - 2 * margin, 8, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Descripción', margin + 5, y + 5.5);
+    doc.text('Cant.', margin + 100, y + 5.5);
+    doc.text('Precio Unit.', margin + 120, y + 5.5);
+    doc.text('Subtotal', margin + 150, y + 5.5);
+
+    y += 8;
+    doc.setTextColor(0, 0, 0);
+
+    // Fila de datos
+    doc.setFont('helvetica', 'normal');
+    doc.rect(margin, y, pageWidth - 2 * margin, 10);
+    doc.text('Servicios de flete', margin + 5, y + 6.5);
+    doc.text('1', margin + 100, y + 6.5);
+    doc.text(formatCurrency(neto), margin + 120, y + 6.5);
+    doc.text(formatCurrency(neto), margin + 150, y + 6.5);
+
+    y += 20;
+
+    // ===== TOTALES =====
+    const totalsX = pageWidth - margin - 70;
+    
+    doc.setFontSize(10);
+    doc.text('Subtotal Neto:', totalsX, y);
+    doc.text(formatCurrency(neto), pageWidth - margin, y, { align: 'right' });
+    
+    y += 6;
+    doc.text('IVA 21%:', totalsX, y);
+    doc.text(formatCurrency(iva), pageWidth - margin, y, { align: 'right' });
+    
+    y += 2;
+    doc.setLineWidth(0.5);
+    doc.line(totalsX, y, pageWidth - margin, y);
+    
+    y += 8;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL:', totalsX, y);
+    doc.text(formatCurrency(total), pageWidth - margin, y, { align: 'right' });
+
+    y += 20;
+
+    // ===== CAE =====
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, pageWidth - 2 * margin, 30);
+    doc.setFillColor(249, 249, 249);
+    doc.rect(margin, y, pageWidth - 2 * margin, 30, 'F');
+    doc.rect(margin, y, pageWidth - 2 * margin, 30);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CAE (Código de Autorización Electrónico)', margin + 5, y + 8);
+    
+    doc.setFontSize(14);
+    doc.setFont('courier', 'bold');
+    doc.text(cae, margin + 5, y + 18);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Fecha de Vencimiento: ${formatDate(caeExpiration)}`, margin + 5, y + 25);
+
+    // QR placeholder (cuadrado a la derecha)
+    const qrSize = 25;
+    const qrX = pageWidth - margin - qrSize - 5;
+    const qrY = y + 2.5;
+    doc.rect(qrX, qrY, qrSize, qrSize);
+    doc.setFontSize(7);
+    doc.text('QR AFIP', qrX + qrSize/2, qrY + qrSize/2 + 2, { align: 'center' });
+
+    y += 40;
+
+    // ===== FOOTER =====
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text('Comprobante autorizado - Verifique este comprobante en: www.afip.gob.ar/fe/qr/', pageWidth / 2, y, { align: 'center' });
+
+    // Generar buffer
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+
+    return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="Factura_${invoiceNumber.replace('-', '_')}.pdf"`,
       },
     });
+
   } catch (error) {
     console.error('Error generando PDF:', error);
-    // Fallback: devolver HTML para imprimir manualmente
-    return new NextResponse(html, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-      },
+    return new NextResponse(JSON.stringify({ error: 'Error generando PDF' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 }
-
