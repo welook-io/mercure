@@ -2,7 +2,8 @@ import { requireAuth } from "@/lib/auth";
 import { Navbar } from "@/components/layout/navbar";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { Download, FileText, ExternalLink } from "lucide-react";
+import { FileText } from "lucide-react";
+import { DownloadButton } from "./download-button";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-AR', {
@@ -114,15 +115,17 @@ export default async function FacturasPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <a
-                            href={`/api/afip/generate-pdf?invoiceNumber=${encodeURIComponent(factura.invoice_number)}&cae=${encodeURIComponent(factura.cae)}&caeExpiration=${encodeURIComponent(factura.cae_expiration)}&clienteCuit=${encodeURIComponent(factura.client_cuit || '')}&clienteNombre=${encodeURIComponent(factura.client_name)}&neto=${factura.neto}&iva=${factura.iva}&total=${factura.total}&invoiceType=${factura.invoice_type}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            PDF
-                          </a>
+                          <DownloadButton
+                            invoiceNumber={factura.invoice_number}
+                            cae={factura.cae}
+                            caeExpiration={factura.cae_expiration}
+                            clienteCuit={factura.client_cuit || ''}
+                            clienteNombre={factura.client_name}
+                            neto={Number(factura.neto)}
+                            iva={Number(factura.iva)}
+                            total={Number(factura.total)}
+                            invoiceType={factura.invoice_type}
+                          />
                         </td>
                       </tr>
                     ))
