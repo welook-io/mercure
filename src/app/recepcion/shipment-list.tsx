@@ -102,17 +102,19 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
                     {s.remito_image_url && (
                       <button
                         onClick={() => setImageModal({ url: s.remito_image_url!, title: `Remito ${s.delivery_note_number || s.id}` })}
-                        className="flex-1 h-20 rounded-lg overflow-hidden border border-neutral-200"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs"
                       >
-                        <img src={s.remito_image_url} alt="Remito" className="w-full h-full object-cover" />
+                        <FileText className="w-4 h-4" />
+                        Ver Remito
                       </button>
                     )}
                     {s.cargo_image_url && (
                       <button
                         onClick={() => setImageModal({ url: s.cargo_image_url!, title: `Carga ${s.delivery_note_number || s.id}` })}
-                        className="flex-1 h-20 rounded-lg overflow-hidden border border-neutral-200"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 text-xs"
                       >
-                        <img src={s.cargo_image_url} alt="Carga" className="w-full h-full object-cover" />
+                        <ImageIcon className="w-4 h-4" />
+                        Ver Carga
                       </button>
                     )}
                   </div>
@@ -203,27 +205,27 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
                       {s.remito_image_url ? (
                         <button
                           onClick={() => setImageModal({ url: s.remito_image_url!, title: `Remito ${s.delivery_note_number || s.id}` })}
-                          className="w-8 h-8 rounded overflow-hidden border border-neutral-200 hover:border-orange-400 transition-colors"
+                          className="w-6 h-6 rounded flex items-center justify-center text-blue-600 hover:bg-blue-50 transition-colors"
                           title="Ver remito"
                         >
-                          <img src={s.remito_image_url} alt="Remito" className="w-full h-full object-cover" />
+                          <FileText className="w-4 h-4" />
                         </button>
                       ) : (
-                        <div className="w-8 h-8 rounded border border-dashed border-neutral-200 flex items-center justify-center">
-                          <FileText className="w-3 h-3 text-neutral-300" />
+                        <div className="w-6 h-6 flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-neutral-200" />
                         </div>
                       )}
                       {s.cargo_image_url ? (
                         <button
                           onClick={() => setImageModal({ url: s.cargo_image_url!, title: `Carga ${s.delivery_note_number || s.id}` })}
-                          className="w-8 h-8 rounded overflow-hidden border border-neutral-200 hover:border-orange-400 transition-colors"
+                          className="w-6 h-6 rounded flex items-center justify-center text-green-600 hover:bg-green-50 transition-colors"
                           title="Ver carga"
                         >
-                          <img src={s.cargo_image_url} alt="Carga" className="w-full h-full object-cover" />
+                          <ImageIcon className="w-4 h-4" />
                         </button>
                       ) : (
-                        <div className="w-8 h-8 rounded border border-dashed border-neutral-200 flex items-center justify-center">
-                          <ImageIcon className="w-3 h-3 text-neutral-300" />
+                        <div className="w-6 h-6 flex items-center justify-center">
+                          <ImageIcon className="w-4 h-4 text-neutral-200" />
                         </div>
                       )}
                     </div>
