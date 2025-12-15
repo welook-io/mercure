@@ -246,20 +246,27 @@ export async function POST(request: NextRequest) {
         }
       });
 
-    // Calcular cotización automáticamente si hay datos suficientes
+    // Calcular cotización automáticamente si hay datos suficientes (peso o volumen)
     let quotationId: string | null = null;
-    if (data.weightKg && parseFloat(data.weightKg) > 0) {
+    const hasWeight = data.weightKg && parseFloat(data.weightKg) > 0;
+    const hasVolume = data.volumeM3 && parseFloat(data.volumeM3) > 0;
+    
+    if (hasWeight || hasVolume) {
       try {
         // Llamar al cotizador
+        const weightKg = data.weightKg ? parseFloat(data.weightKg) : 0;
+        const volumeM3 = data.volumeM3 ? parseFloat(data.volumeM3) : 0;
+        const declaredValue = data.declaredValue ? parseFloat(data.declaredValue) : 0;
+        
         const pricingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/detect-pricing`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             clientId: recipientId, // El que paga es normalmente el destinatario
             cargo: {
-              weightKg: parseFloat(data.weightKg),
-              volumeM3: data.volumeM3 ? parseFloat(data.volumeM3) : null,
-              declaredValue: data.declaredValue ? parseFloat(data.declaredValue) : null,
+              weightKg,
+              volumeM3,
+              declaredValue,
             },
             origin: 'Buenos Aires',
             destination: 'Jujuy',
@@ -283,13 +290,13 @@ export async function POST(request: NextRequest) {
                 customer_cuit: data.recipientCuit || null,
                 origin: 'Buenos Aires',
                 destination: 'Jujuy',
-                weight_kg: parseFloat(data.weightKg),
-                volume_m3: data.volumeM3 ? parseFloat(data.volumeM3) : 0,
+                weight_kg: weightKg,
+                volume_m3: volumeM3,
                 volumetric_weight_kg: pricing.breakdown?.peso_volumetrico || null,
-                chargeable_weight_kg: pricing.breakdown?.peso_cobrado || parseFloat(data.weightKg),
-                declared_value: data.declaredValue ? parseFloat(data.declaredValue) : 0,
-                base_price: pricing.breakdown?.flete_final || pricing.price,
-                insurance_value: data.declaredValue ? parseFloat(data.declaredValue) : null,
+                chargeable_weight_kg: pricing.breakdown?.peso_cobrado || Math.max(weightKg, volumeM3 * 300),
+                declared_value: declaredValue,
+                base_price: pricing.breakdown?.flete_final || pricing.breakdown?.flete_lista || pricing.price,
+                insurance_value: declaredValue || null,
                 insurance_cost: pricing.breakdown?.seguro || 0,
                 total_price: pricing.price,
                 includes_iva: false,
