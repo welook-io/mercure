@@ -54,19 +54,37 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { 
+      clientId,        // ID directo del cliente (nuevo)
       recipientCuit, 
       recipientName,
       destination,
       packageQuantity,
       weightKg,
       volumeM3,
-      declaredValue
+      declaredValue,
+      cargo            // Objeto alternativo con weightKg, volumeM3, declaredValue
     } = body;
 
-    // PASO 1: Buscar cliente por CUIT o nombre
+    // Normalizar datos de carga (soportar ambos formatos)
+    const actualWeightKg = cargo?.weightKg ?? weightKg;
+    const actualVolumeM3 = cargo?.volumeM3 ?? volumeM3;
+    const actualDeclaredValue = cargo?.declaredValue ?? declaredValue;
+
+    // PASO 1: Buscar cliente por ID, CUIT o nombre
     let client = null;
     
-    if (recipientCuit) {
+    // Primero intentar por ID si viene
+    if (clientId) {
+      const { data } = await supabase
+        .from('mercure_entities')
+        .select('id, legal_name, tax_id, client_type, payment_terms, assigned_tariff_id')
+        .eq('id', clientId)
+        .single();
+      client = data;
+    }
+    
+    // Si no, buscar por CUIT
+    if (!client && recipientCuit) {
       const { data } = await supabase
         .from('mercure_entities')
         .select('id, legal_name, tax_id, client_type, payment_terms, assigned_tariff_id')
@@ -75,6 +93,7 @@ export async function POST(request: NextRequest) {
       client = data;
     }
     
+    // Si no, buscar por nombre
     if (!client && recipientName) {
       const { data } = await supabase
         .from('mercure_entities')
@@ -85,9 +104,20 @@ export async function POST(request: NextRequest) {
       client = data;
     }
 
-    // CAMINO A: Cliente Cuenta Corriente
-    if (client && (client.client_type === 'regular' || client.payment_terms === 'cuenta_corriente')) {
-      const result = await handlePathA(client, { packageQuantity, weightKg, volumeM3, declaredValue });
+    // CAMINO A: Cliente Cuenta Corriente o con términos comerciales
+    // También verificar si tiene términos comerciales configurados
+    let hasCommercialTerms = false;
+    if (client) {
+      const { data: terms } = await supabase
+        .from('mercure_client_commercial_terms')
+        .select('id')
+        .eq('entity_id', client.id)
+        .single();
+      hasCommercialTerms = !!terms;
+    }
+
+    if (client && (client.client_type === 'regular' || client.payment_terms === 'cuenta_corriente' || hasCommercialTerms)) {
+      const result = await handlePathA(client, { packageQuantity, weightKg: actualWeightKg, volumeM3: actualVolumeM3, declaredValue: actualDeclaredValue });
       return NextResponse.json(result);
     }
 
@@ -96,12 +126,12 @@ export async function POST(request: NextRequest) {
 
     // CAMINO B: Tiene cotización del bot
     if (quotation) {
-      const result = await handlePathB(client, quotation, { packageQuantity, weightKg });
+      const result = await handlePathB(client, quotation, { packageQuantity, weightKg: actualWeightKg });
       return NextResponse.json(result);
     }
 
     // CAMINO C: Doña Rosa - Tarifa general
-    const result = await handlePathC(client, recipientName, { packageQuantity, weightKg, volumeM3, declaredValue });
+    const result = await handlePathC(client, recipientName, { packageQuantity, weightKg: actualWeightKg, volumeM3: actualVolumeM3, declaredValue: actualDeclaredValue });
     return NextResponse.json(result);
 
   } catch (error) {

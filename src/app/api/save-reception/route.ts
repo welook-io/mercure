@@ -246,6 +246,76 @@ export async function POST(request: NextRequest) {
         }
       });
 
+    // Calcular cotización automáticamente si hay datos suficientes
+    let quotationId: string | null = null;
+    if (data.weightKg && parseFloat(data.weightKg) > 0) {
+      try {
+        // Llamar al cotizador
+        const pricingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/detect-pricing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: recipientId, // El que paga es normalmente el destinatario
+            cargo: {
+              weightKg: parseFloat(data.weightKg),
+              volumeM3: data.volumeM3 ? parseFloat(data.volumeM3) : null,
+              declaredValue: data.declaredValue ? parseFloat(data.declaredValue) : null,
+            },
+            origin: 'Buenos Aires',
+            destination: 'Jujuy',
+          }),
+        });
+
+        if (pricingResponse.ok) {
+          const pricingResult = await pricingResponse.json();
+          
+          if (pricingResult.price && pricingResult.price > 0) {
+            // Guardar la cotización
+            const { data: quotation, error: quotationError } = await supabaseAdmin
+              .from('mercure_quotations')
+              .insert({
+                shipment_id: shipment.id,
+                entity_id: recipientId,
+                customer_name: data.recipientName,
+                customer_cuit: data.recipientCuit || null,
+                origin: 'Buenos Aires',
+                destination: 'Jujuy',
+                weight_kg: parseFloat(data.weightKg),
+                volume_m3: data.volumeM3 ? parseFloat(data.volumeM3) : null,
+                volumetric_weight_kg: pricingResult.breakdown?.peso_volumetrico || null,
+                chargeable_weight_kg: pricingResult.breakdown?.peso_cobrado || parseFloat(data.weightKg),
+                base_price: pricingResult.breakdown?.flete_final || pricingResult.price,
+                insurance_value: data.declaredValue ? parseFloat(data.declaredValue) : null,
+                insurance_cost: pricingResult.breakdown?.seguro || 0,
+                total_price: pricingResult.price,
+                includes_iva: false,
+                status: 'confirmed',
+                source: 'reception',
+                package_quantity: data.packageQuantity ? parseInt(data.packageQuantity) : null,
+                declared_description: data.loadDescription || null,
+              })
+              .select('id')
+              .single();
+
+            if (!quotationError && quotation) {
+              quotationId = quotation.id;
+              
+              // Actualizar el shipment con el quotation_id
+              await supabaseAdmin
+                .from('mercure_shipments')
+                .update({ quotation_id: quotationId })
+                .eq('id', shipment.id);
+            } else {
+              console.error('Error creating quotation:', quotationError);
+            }
+          }
+        }
+      } catch (pricingError) {
+        console.error('Error calculating pricing:', pricingError);
+        // No fallar el guardado si el pricing falla
+      }
+    }
+
     // Registrar en audit log con info del usuario
     let userOverride: { userId?: string; email?: string; name?: string } | undefined;
     try {
