@@ -12,7 +12,7 @@ async function getRecentShipments() {
       *,
       sender:mercure_entities!sender_id(legal_name),
       recipient:mercure_entities!recipient_id(legal_name),
-      quotation:mercure_quotations(total_price)
+      quotation:mercure_quotations!mercure_shipments_quotation_id_fkey(total_price)
     `)
     .in('status', ['received', 'in_warehouse', 'ingresada'])
     .is('trip_id', null)
