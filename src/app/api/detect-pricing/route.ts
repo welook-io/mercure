@@ -364,40 +364,74 @@ async function handlePathC(
   cargo: { packageQuantity?: number; weightKg?: number; volumeM3?: number; declaredValue?: number }
 ): Promise<PricingResult> {
   
-  // Buscar tarifa general (la más cara)
-  const { data: generalTariff } = await supabase
-    .from('mercure_tariffs')
-    .select('*')
-    .eq('tariff_type', 'standard')
-    .order('price', { ascending: false })
-    .limit(1)
-    .single();
-
   let price = null;
   let breakdown: Record<string, number> | undefined = undefined;
+  let tariffId: number | undefined = undefined;
 
   // Calcular peso a cobrar: el MAYOR entre peso real y peso volumétrico
   const { pesoACobrar, usaVolumen } = calcularPesoACobrar(cargo);
 
-  if (generalTariff && pesoACobrar > 0) {
-    const basePorPeso = (generalTariff.price_per_kg || 500) * pesoACobrar;
-    const minimo = generalTariff.price || 5000;
-    price = Math.max(basePorPeso, minimo);
+  if (pesoACobrar > 0) {
+    // Redondear al múltiplo de 10 más cercano hacia arriba
+    const weightBucket = Math.ceil(pesoACobrar / 10) * 10;
     
-    breakdown = {
-      base: minimo,
-      porPeso: basePorPeso,
-      aplicado: price,
-      peso_cobrado: pesoACobrar
-    };
-    
-    console.log('[detect-pricing] Path C - Tarifa general:', {
-      pesoACobrar,
-      usaVolumen: usaVolumen ? 'VOLUMEN' : 'PESO REAL',
-      basePorPeso,
-      minimo,
-      precioFinal: price
-    });
+    // Buscar tarifa por peso (igual que en Path A)
+    const { data: tariff, error: tariffError } = await supabase
+      .from('mercure_tariffs')
+      .select('*')
+      .gte('weight_to_kg', weightBucket)
+      .order('weight_to_kg', { ascending: true })
+      .limit(1)
+      .single();
+
+    console.log('[detect-pricing] Path C - Buscando tarifa para peso:', weightBucket, 'kg');
+    console.log('[detect-pricing] Tarifa encontrada:', tariff?.id, 'weight_to_kg:', tariff?.weight_to_kg, 'price:', tariff?.price);
+
+    if (tariff) {
+      tariffId = tariff.id;
+      const basePrice = parseFloat(tariff.price) || 0;
+      
+      breakdown = {
+        flete_lista: basePrice,
+        peso_cobrado: pesoACobrar,
+        flete_final: basePrice
+      };
+      
+      // Calcular seguro sobre valor declarado (8 por mil por defecto)
+      if (cargo.declaredValue && cargo.declaredValue > 0) {
+        const insuranceRate = 0.008;
+        breakdown.seguro = cargo.declaredValue * insuranceRate;
+      }
+      
+      price = basePrice + (breakdown.seguro || 0);
+      
+      console.log('[detect-pricing] Path C - Tarifa general:', {
+        pesoACobrar,
+        usaVolumen: usaVolumen ? 'VOLUMEN' : 'PESO REAL',
+        weightBucket,
+        tarifaEncontrada: tariff.weight_to_kg,
+        precioLista: basePrice,
+        seguro: breakdown.seguro || 0,
+        precioFinal: price
+      });
+    } else {
+      // Fallback: precio por kg si no hay tarifa
+      console.log('[detect-pricing] Path C - No hay tarifa, usando fallback $500/kg');
+      const precioPorKg = 500;
+      const basePrice = pesoACobrar * precioPorKg;
+      
+      breakdown = {
+        flete_lista: basePrice,
+        peso_cobrado: pesoACobrar,
+        flete_final: basePrice
+      };
+      
+      if (cargo.declaredValue && cargo.declaredValue > 0) {
+        breakdown.seguro = cargo.declaredValue * 0.008;
+      }
+      
+      price = basePrice + (breakdown.seguro || 0);
+    }
   }
 
   return {
@@ -419,7 +453,7 @@ async function handlePathC(
       source: 'general',
       price,
       breakdown,
-      tariffId: generalTariff?.id
+      tariffId
     },
     validation: {
       needsReview: true,
