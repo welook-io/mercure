@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { SHIPMENT_STATUS_LABELS } from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
-import { ChevronDown, Package, FileText, Pencil, Printer } from "lucide-react";
+import { ChevronDown, Package, FileText, Pencil, Image as ImageIcon, X } from "lucide-react";
 import Link from "next/link";
 
 type Shipment = {
@@ -19,6 +19,8 @@ type Shipment = {
   sender: { legal_name: string } | null;
   recipient: { legal_name: string } | null;
   quotation: { total_price: number } | null;
+  remito_image_url: string | null;
+  cargo_image_url: string | null;
 };
 
 function getStatusVariant(status: string): "default" | "success" | "warning" | "error" | "info" {
@@ -32,6 +34,7 @@ function getStatusVariant(status: string): "default" | "success" | "warning" | "
 
 export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [imageModal, setImageModal] = useState<{ url: string; title: string } | null>(null);
 
   // Calcular total del flete
   const totalFlete = shipments.reduce((sum, s) => {
@@ -93,6 +96,27 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
             {/* Vista expandida - detalles */}
             {expanded === s.id && (
               <div className="px-3 pb-3 pt-1 border-t border-neutral-100 bg-neutral-50/50">
+                {/* Fotos */}
+                {(s.remito_image_url || s.cargo_image_url) && (
+                  <div className="flex gap-2 mb-3">
+                    {s.remito_image_url && (
+                      <button
+                        onClick={() => setImageModal({ url: s.remito_image_url!, title: `Remito ${s.delivery_note_number || s.id}` })}
+                        className="flex-1 h-20 rounded-lg overflow-hidden border border-neutral-200"
+                      >
+                        <img src={s.remito_image_url} alt="Remito" className="w-full h-full object-cover" />
+                      </button>
+                    )}
+                    {s.cargo_image_url && (
+                      <button
+                        onClick={() => setImageModal({ url: s.cargo_image_url!, title: `Carga ${s.delivery_note_number || s.id}` })}
+                        className="flex-1 h-20 rounded-lg overflow-hidden border border-neutral-200"
+                      >
+                        <img src={s.cargo_image_url} alt="Carga" className="w-full h-full object-cover" />
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div>
                     <span className="text-xs text-neutral-500">Remito</span>
@@ -158,6 +182,7 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-neutral-50 border-b border-neutral-200">
+                <th className="px-2 py-2 text-center text-xs font-medium text-neutral-500 uppercase w-16">Fotos</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remito</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remitente</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Destinatario</th>
@@ -173,6 +198,36 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
             <tbody>
               {shipments.map((s) => (
                 <tr key={s.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
+                  <td className="px-2 py-1">
+                    <div className="flex items-center justify-center gap-1">
+                      {s.remito_image_url ? (
+                        <button
+                          onClick={() => setImageModal({ url: s.remito_image_url!, title: `Remito ${s.delivery_note_number || s.id}` })}
+                          className="w-8 h-8 rounded overflow-hidden border border-neutral-200 hover:border-orange-400 transition-colors"
+                          title="Ver remito"
+                        >
+                          <img src={s.remito_image_url} alt="Remito" className="w-full h-full object-cover" />
+                        </button>
+                      ) : (
+                        <div className="w-8 h-8 rounded border border-dashed border-neutral-200 flex items-center justify-center">
+                          <FileText className="w-3 h-3 text-neutral-300" />
+                        </div>
+                      )}
+                      {s.cargo_image_url ? (
+                        <button
+                          onClick={() => setImageModal({ url: s.cargo_image_url!, title: `Carga ${s.delivery_note_number || s.id}` })}
+                          className="w-8 h-8 rounded overflow-hidden border border-neutral-200 hover:border-orange-400 transition-colors"
+                          title="Ver carga"
+                        >
+                          <img src={s.cargo_image_url} alt="Carga" className="w-full h-full object-cover" />
+                        </button>
+                      ) : (
+                        <div className="w-8 h-8 rounded border border-dashed border-neutral-200 flex items-center justify-center">
+                          <ImageIcon className="w-3 h-3 text-neutral-300" />
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-3 py-2 font-medium">{s.delivery_note_number || `#${s.id}`}</td>
                   <td className="px-3 py-2 text-neutral-600 truncate max-w-[120px]">{s.sender?.legal_name || '-'}</td>
                   <td className="px-3 py-2 text-neutral-600 truncate max-w-[120px]">{s.recipient?.legal_name || '-'}</td>
@@ -213,7 +268,7 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
             </tbody>
             <tfoot>
               <tr className="bg-neutral-100 border-t border-neutral-300">
-                <td colSpan={6} className="px-3 py-2 text-right text-sm font-bold text-neutral-700">
+                <td colSpan={7} className="px-3 py-2 text-right text-sm font-bold text-neutral-700">
                   TOTAL FLETE
                 </td>
                 <td className="px-3 py-2 text-right text-sm font-bold text-neutral-900">
@@ -225,6 +280,32 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
           </table>
         </div>
       </div>
+
+      {/* Modal de imagen */}
+      {imageModal && (
+        <div 
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setImageModal(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] w-full">
+            <button
+              onClick={() => setImageModal(null)}
+              className="absolute -top-10 right-0 text-white hover:text-neutral-300 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <p className="absolute -top-10 left-0 text-white text-sm font-medium">
+              {imageModal.title}
+            </p>
+            <img 
+              src={imageModal.url} 
+              alt={imageModal.title}
+              className="w-full h-auto max-h-[85vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
