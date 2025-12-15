@@ -294,9 +294,8 @@ export async function POST(request: NextRequest) {
                 volume_m3: volumeM3,
                 volumetric_weight_kg: pricing.breakdown?.peso_volumetrico || null,
                 chargeable_weight_kg: pricing.breakdown?.peso_cobrado || Math.max(weightKg, volumeM3 * 300),
-                declared_value: declaredValue,
                 base_price: pricing.breakdown?.flete_final || pricing.breakdown?.flete_lista || pricing.price,
-                insurance_value: declaredValue || null,
+                insurance_value: declaredValue || null, // Valor declarado para el seguro
                 insurance_cost: pricing.breakdown?.seguro || 0,
                 total_price: pricing.price,
                 includes_iva: false,
