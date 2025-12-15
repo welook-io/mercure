@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 
 // Datos del emisor (Mercure)
 const EMISOR = {
@@ -356,26 +358,51 @@ export async function GET(request: NextRequest) {
   <div class="footer">
     Comprobante autorizado - Verifique este comprobante en: www.afip.gob.ar/fe/qr/
   </div>
-  
-  <script>
-    // Auto-abrir diálogo de impresión al cargar
-    window.onload = function() {
-      // Pequeño delay para que cargue el QR
-      setTimeout(function() {
-        window.print();
-      }, 500);
-    };
-  </script>
 </body>
 </html>
 `;
 
-  // Devolver HTML optimizado para imprimir como PDF desde el navegador
-  // El usuario puede usar Ctrl+P / Cmd+P para guardar como PDF
-  return new NextResponse(html, {
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-    },
-  });
+  // Generar PDF con Puppeteer + Chromium serverless
+  try {
+    const executablePath = await chromium.executablePath();
+    
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: { width: 1200, height: 800 },
+      executablePath,
+      headless: true,
+    });
+    
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '15mm',
+        bottom: '15mm',
+        left: '20mm',
+        right: '20mm',
+      },
+    });
+    
+    await browser.close();
+    
+    return new NextResponse(Buffer.from(pdfBuffer), {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="Factura_${invoiceNumber.replace('-', '_')}.pdf"`,
+      },
+    });
+  } catch (error) {
+    console.error('Error generando PDF:', error);
+    // Fallback: devolver HTML para imprimir manualmente
+    return new NextResponse(html, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+      },
+    });
+  }
 }
 
