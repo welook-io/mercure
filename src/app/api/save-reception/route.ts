@@ -268,8 +268,11 @@ export async function POST(request: NextRequest) {
 
         if (pricingResponse.ok) {
           const pricingResult = await pricingResponse.json();
+          const pricing = pricingResult.pricing;
           
-          if (pricingResult.price && pricingResult.price > 0) {
+          console.log('[save-reception] Pricing result:', JSON.stringify(pricingResult, null, 2));
+          
+          if (pricing?.price && pricing.price > 0) {
             // Guardar la cotización
             const { data: quotation, error: quotationError } = await supabaseAdmin
               .from('mercure_quotations')
@@ -282,12 +285,12 @@ export async function POST(request: NextRequest) {
                 destination: 'Jujuy',
                 weight_kg: parseFloat(data.weightKg),
                 volume_m3: data.volumeM3 ? parseFloat(data.volumeM3) : null,
-                volumetric_weight_kg: pricingResult.breakdown?.peso_volumetrico || null,
-                chargeable_weight_kg: pricingResult.breakdown?.peso_cobrado || parseFloat(data.weightKg),
-                base_price: pricingResult.breakdown?.flete_final || pricingResult.price,
+                volumetric_weight_kg: pricing.breakdown?.peso_volumetrico || null,
+                chargeable_weight_kg: pricing.breakdown?.peso_cobrado || parseFloat(data.weightKg),
+                base_price: pricing.breakdown?.flete_final || pricing.price,
                 insurance_value: data.declaredValue ? parseFloat(data.declaredValue) : null,
-                insurance_cost: pricingResult.breakdown?.seguro || 0,
-                total_price: pricingResult.price,
+                insurance_cost: pricing.breakdown?.seguro || 0,
+                total_price: pricing.price,
                 includes_iva: false,
                 status: 'confirmed',
                 source: 'reception',
