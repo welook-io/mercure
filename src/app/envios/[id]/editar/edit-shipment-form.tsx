@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Save, Loader2, RefreshCw, Calculator } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Calculator, Trash2, Upload, Image as ImageIcon, X } from "lucide-react";
 import Link from "next/link";
 
 interface Entity {
@@ -27,6 +27,8 @@ interface ShipmentData {
   payment_terms: string | null;
   notes: string | null;
   quotation_id: string | null;
+  remito_image_url: string | null;
+  cargo_image_url: string | null;
   sender?: Entity | null;
   recipient?: Entity | null;
 }
@@ -46,9 +48,19 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isQuoting, setIsQuoting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [quotation, setQuotation] = useState<QuotationData | null>(null);
   const [newQuotation, setNewQuotation] = useState<{ price: number; breakdown: Record<string, number> } | null>(null);
+  
+  // Estados para imágenes
+  const [remitoImageUrl, setRemitoImageUrl] = useState<string | null>(shipment.remito_image_url);
+  const [cargoImageUrl, setCargoImageUrl] = useState<string | null>(shipment.cargo_image_url);
+  const [imageModal, setImageModal] = useState<{ url: string; title: string } | null>(null);
+  const remitoInputRef = useRef<HTMLInputElement>(null);
+  const cargoInputRef = useRef<HTMLInputElement>(null);
   
   // Cargar cotización existente
   useEffect(() => {
@@ -134,6 +146,81 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
       setMessage({ type: 'error', text: 'Error al recotizar' });
     } finally {
       setIsQuoting(false);
+    }
+  };
+
+  // Subir imagen
+  const handleImageUpload = async (file: File, type: 'remito' | 'cargo') => {
+    setIsUploading(true);
+    setMessage(null);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${shipment.id}_${type}_${Date.now()}.${fileExt}`;
+      const filePath = `shipments/${fileName}`;
+
+      // Subir a Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('mercure-images')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Obtener URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('mercure-images')
+        .getPublicUrl(filePath);
+
+      // Actualizar en la base de datos
+      const updateField = type === 'remito' ? 'remito_image_url' : 'cargo_image_url';
+      const { error: updateError } = await supabase
+        .from('mercure_shipments')
+        .update({ [updateField]: publicUrl })
+        .eq('id', shipment.id);
+
+      if (updateError) throw updateError;
+
+      // Actualizar estado local
+      if (type === 'remito') {
+        setRemitoImageUrl(publicUrl);
+      } else {
+        setCargoImageUrl(publicUrl);
+      }
+
+      setMessage({ type: 'success', text: `Foto de ${type === 'remito' ? 'remito' : 'carga'} subida correctamente` });
+    } catch (error) {
+      console.error('Error subiendo imagen:', error);
+      setMessage({ type: 'error', text: 'Error al subir la imagen' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Eliminar remito
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setMessage(null);
+
+    try {
+      const { error } = await supabase
+        .from('mercure_shipments')
+        .delete()
+        .eq('id', shipment.id);
+
+      if (error) throw error;
+
+      setMessage({ type: 'success', text: 'Remito eliminado correctamente' });
+      
+      setTimeout(() => {
+        router.push('/recepcion');
+        router.refresh();
+      }, 1000);
+    } catch (error) {
+      console.error('Error eliminando:', error);
+      setMessage({ type: 'error', text: 'Error al eliminar el remito' });
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -441,6 +528,102 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
           />
         </div>
 
+        {/* Fotos */}
+        <div className="p-3 bg-neutral-50 border border-neutral-200 rounded">
+          <label className="block text-xs font-medium text-neutral-500 uppercase mb-3">Fotos</label>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Foto Remito */}
+            <div>
+              <p className="text-xs text-neutral-600 mb-2">Foto del Remito</p>
+              {remitoImageUrl ? (
+                <div className="relative group">
+                  <img 
+                    src={remitoImageUrl} 
+                    alt="Remito" 
+                    className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-90"
+                    onClick={() => setImageModal({ url: remitoImageUrl, title: 'Foto del Remito' })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => remitoInputRef.current?.click()}
+                    className="absolute bottom-2 right-2 h-7 px-2 text-xs bg-white/90 hover:bg-white border rounded flex items-center gap-1"
+                  >
+                    <Upload className="w-3 h-3" /> Cambiar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => remitoInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-full h-32 border-2 border-dashed border-neutral-300 hover:border-orange-400 rounded flex flex-col items-center justify-center gap-2 text-neutral-400 hover:text-orange-500 transition-colors"
+                >
+                  <ImageIcon className="w-8 h-8" />
+                  <span className="text-xs">Subir foto del remito</span>
+                </button>
+              )}
+              <input
+                ref={remitoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file, 'remito');
+                }}
+              />
+            </div>
+
+            {/* Foto Carga */}
+            <div>
+              <p className="text-xs text-neutral-600 mb-2">Foto de la Carga</p>
+              {cargoImageUrl ? (
+                <div className="relative group">
+                  <img 
+                    src={cargoImageUrl} 
+                    alt="Carga" 
+                    className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-90"
+                    onClick={() => setImageModal({ url: cargoImageUrl, title: 'Foto de la Carga' })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => cargoInputRef.current?.click()}
+                    className="absolute bottom-2 right-2 h-7 px-2 text-xs bg-white/90 hover:bg-white border rounded flex items-center gap-1"
+                  >
+                    <Upload className="w-3 h-3" /> Cambiar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => cargoInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-full h-32 border-2 border-dashed border-neutral-300 hover:border-orange-400 rounded flex flex-col items-center justify-center gap-2 text-neutral-400 hover:text-orange-500 transition-colors"
+                >
+                  <ImageIcon className="w-8 h-8" />
+                  <span className="text-xs">Subir foto de la carga</span>
+                </button>
+              )}
+              <input
+                ref={cargoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file, 'cargo');
+                }}
+              />
+            </div>
+          </div>
+          {isUploading && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-orange-600">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Subiendo imagen...
+            </div>
+          )}
+        </div>
+
         {/* Botones */}
         <div className="flex gap-3 pt-4 border-t border-neutral-200">
           <Link 
@@ -461,8 +644,74 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
             )}
             Guardar Cambios
           </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="h-9 px-4 text-sm border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center gap-2 ml-auto"
+          >
+            <Trash2 className="w-4 h-4" />
+            Eliminar
+          </button>
         </div>
       </form>
+
+      {/* Modal de confirmación de eliminación */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-medium text-neutral-900 mb-2">¿Eliminar este remito?</h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              Esta acción no se puede deshacer. Se eliminará el remito <strong>{remitoNumber}</strong> y toda su información asociada.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="h-9 px-4 text-sm border border-neutral-200 hover:bg-neutral-50 rounded"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="h-9 px-4 text-sm bg-red-600 hover:bg-red-700 text-white rounded flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de imagen */}
+      {imageModal && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => setImageModal(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <button
+              onClick={() => setImageModal(null)}
+              className="absolute -top-10 right-0 text-white hover:text-neutral-300"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <p className="text-white text-sm mb-2">{imageModal.title}</p>
+            <img 
+              src={imageModal.url} 
+              alt={imageModal.title}
+              className="max-w-full max-h-[80vh] object-contain rounded"
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
