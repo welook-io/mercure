@@ -15,10 +15,6 @@ interface Entity {
   email: string | null;
   phone: string | null;
   address: string | null;
-  city: string | null;
-  province: string | null;
-  postal_code: string | null;
-  contact_name: string | null;
   notes: string | null;
 }
 
@@ -56,10 +52,6 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
     email: entity.email || '',
     phone: entity.phone || '',
     address: entity.address || '',
-    city: entity.city || '',
-    province: entity.province || '',
-    postal_code: entity.postal_code || '',
-    contact_name: entity.contact_name || '',
     notes: entity.notes || '',
     // Acuerdo comercial
     tariff_modifier: commercialTerms?.tariff_modifier?.toString() || '0',
@@ -82,7 +74,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
     setError(null);
 
     try {
-      // Actualizar entidad
+      // Actualizar entidad solo con campos que existen
       const { error: updateError } = await supabase
         .from('mercure_entities')
         .update({
@@ -93,10 +85,6 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
           email: formData.email || null,
           phone: formData.phone || null,
           address: formData.address || null,
-          city: formData.city || null,
-          province: formData.province || null,
-          postal_code: formData.postal_code || null,
-          contact_name: formData.contact_name || null,
           notes: formData.notes || null,
         })
         .eq('id', entity.id);
@@ -157,8 +145,8 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
             Razón Social *
           </label>
@@ -182,7 +170,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
             value={formData.tax_id}
             onChange={handleChange}
             placeholder="30-12345678-9"
-            className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
+            className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0 font-mono"
           />
         </div>
 
@@ -246,20 +234,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-            Contacto
-          </label>
-          <input
-            type="text"
-            name="contact_name"
-            value={formData.contact_name}
-            onChange={handleChange}
-            className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-          />
-        </div>
-
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
             Dirección
           </label>
@@ -272,46 +247,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-            Ciudad
-          </label>
-          <input
-            type="text"
-            name="city"
-            value={formData.city}
-            onChange={handleChange}
-            className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-            Provincia
-          </label>
-          <input
-            type="text"
-            name="province"
-            value={formData.province}
-            onChange={handleChange}
-            className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-            Código Postal
-          </label>
-          <input
-            type="text"
-            name="postal_code"
-            value={formData.postal_code}
-            onChange={handleChange}
-            className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-          />
-        </div>
-
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
             Notas
           </label>
@@ -319,7 +255,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
             name="notes"
             value={formData.notes}
             onChange={handleChange}
-            rows={3}
+            rows={2}
             className="w-full px-3 py-2 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0 resize-none"
           />
         </div>
@@ -343,7 +279,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
         </div>
         
         {hasCommercialTerms && (
-          <div className="p-4 grid grid-cols-3 gap-4">
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
                 Modificador Tarifa (%)
@@ -438,4 +374,3 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
     </form>
   );
 }
-

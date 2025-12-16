@@ -24,7 +24,7 @@ interface Remito {
   };
 }
 
-type InvoiceType = 'A' | 'B' | 'B_MONO' | 'B_EXENTO';
+type InvoiceType = 'A' | 'A_MONO' | 'B' | 'B_EXENTO';
 type EmissionMode = 'manual' | 'automatic';
 
 const PUNTOS_VENTA = [
@@ -177,10 +177,12 @@ export function NuevaFacturaClient() {
     }
   };
 
-  // Convertir tipo de factura interno a tipo AFIP ('B_MONO' y 'B_EXENTO' son 'B' para AFIP)
+  // Convertir tipo de factura interno a tipo AFIP
+  // A_MONO = Monotributista recibe Factura A con leyenda especial (ley 2021)
+  // B_EXENTO = Exento recibe Factura B
   const getAfipInvoiceType = (type: InvoiceType): 'A' | 'B' => {
-    if (type === 'B_MONO' || type === 'B_EXENTO') return 'B';
-    return type;
+    if (type === 'A' || type === 'A_MONO') return 'A';
+    return 'B';
   };
 
   const handleEmitir = async () => {
@@ -317,8 +319,8 @@ export function NuevaFacturaClient() {
             className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
           >
             <option value="A">Factura A (Resp. Inscripto)</option>
+            <option value="A_MONO">Factura A (Monotributista)</option>
             <option value="B">Factura B (Consumidor Final)</option>
-            <option value="B_MONO">Factura B (Monotributista)</option>
             <option value="B_EXENTO">Factura B (Exento)</option>
           </select>
         </div>

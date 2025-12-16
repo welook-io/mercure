@@ -21,13 +21,6 @@ const PAYMENT_TERMS = [
   { value: 'transferencia', label: 'Transferencia' },
 ];
 
-const IVA_CONDITIONS = [
-  { value: 'responsable_inscripto', label: 'Responsable Inscripto' },
-  { value: 'monotributista', label: 'Monotributista' },
-  { value: 'exento', label: 'Exento' },
-  { value: 'consumidor_final', label: 'Consumidor Final' },
-];
-
 export default function NuevaEntidadPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -37,15 +30,10 @@ export default function NuevaEntidadPage() {
     legal_name: '',
     tax_id: '',
     entity_type: 'cliente',
-    iva_condition: 'responsable_inscripto',
     payment_terms: '',
     email: '',
     phone: '',
     address: '',
-    city: '',
-    province: '',
-    postal_code: '',
-    contact_name: '',
     notes: '',
     // Acuerdo comercial
     tariff_modifier: '0',
@@ -68,22 +56,17 @@ export default function NuevaEntidadPage() {
     setError(null);
 
     try {
-      // Crear entidad
+      // Crear entidad solo con campos que existen
       const { data: newEntity, error: insertError } = await supabase
         .from('mercure_entities')
         .insert({
           legal_name: formData.legal_name,
           tax_id: formData.tax_id || null,
           entity_type: formData.entity_type || null,
-          iva_condition: formData.iva_condition || null,
           payment_terms: formData.payment_terms || null,
           email: formData.email || null,
           phone: formData.phone || null,
           address: formData.address || null,
-          city: formData.city || null,
-          province: formData.province || null,
-          postal_code: formData.postal_code || null,
-          contact_name: formData.contact_name || null,
           notes: formData.notes || null,
         })
         .select()
@@ -196,22 +179,6 @@ export default function NuevaEntidadPage() {
 
                 <div>
                   <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                    Condición IVA
-                  </label>
-                  <select
-                    name="iva_condition"
-                    value={formData.iva_condition}
-                    onChange={handleChange}
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-                  >
-                    {IVA_CONDITIONS.map(t => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
                     Condición de Pago
                   </label>
                   <select
@@ -226,17 +193,7 @@ export default function NuevaEntidadPage() {
                     ))}
                   </select>
                 </div>
-              </div>
-            </div>
 
-            {/* Contacto */}
-            <div className="border border-neutral-200 rounded overflow-hidden">
-              <div className="bg-neutral-50 px-3 py-2 border-b border-neutral-200">
-                <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
-                  Datos de Contacto
-                </span>
-              </div>
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
                     Email
@@ -265,30 +222,6 @@ export default function NuevaEntidadPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                    Persona de Contacto
-                  </label>
-                  <input
-                    type="text"
-                    name="contact_name"
-                    value={formData.contact_name}
-                    onChange={handleChange}
-                    placeholder="Nombre del contacto"
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Dirección */}
-            <div className="border border-neutral-200 rounded overflow-hidden">
-              <div className="bg-neutral-50 px-3 py-2 border-b border-neutral-200">
-                <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
-                  Dirección
-                </span>
-              </div>
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
                     Dirección
@@ -298,71 +231,24 @@ export default function NuevaEntidadPage() {
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
-                    placeholder="Calle y número"
+                    placeholder="Dirección completa"
                     className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                    Ciudad
+                    Notas
                   </label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
+                  <textarea
+                    name="notes"
+                    value={formData.notes}
                     onChange={handleChange}
-                    placeholder="San Salvador de Jujuy"
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
+                    rows={2}
+                    placeholder="Observaciones adicionales..."
+                    className="w-full px-3 py-2 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0 resize-none"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                    Provincia
-                  </label>
-                  <input
-                    type="text"
-                    name="province"
-                    value={formData.province}
-                    onChange={handleChange}
-                    placeholder="Jujuy"
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                    Código Postal
-                  </label>
-                  <input
-                    type="text"
-                    name="postal_code"
-                    value={formData.postal_code}
-                    onChange={handleChange}
-                    placeholder="4600"
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Notas */}
-            <div className="border border-neutral-200 rounded overflow-hidden">
-              <div className="bg-neutral-50 px-3 py-2 border-b border-neutral-200">
-                <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
-                  Notas
-                </span>
-              </div>
-              <div className="p-4">
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  rows={3}
-                  placeholder="Observaciones adicionales..."
-                  className="w-full px-3 py-2 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0 resize-none"
-                />
               </div>
             </div>
 
@@ -483,4 +369,3 @@ export default function NuevaEntidadPage() {
     </div>
   );
 }
-
