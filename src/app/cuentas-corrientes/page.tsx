@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/auth";
 import { Navbar } from "@/components/layout/navbar";
 import { supabase } from "@/lib/supabase";
 import { ClientList } from "./client-list";
+import Link from "next/link";
 
 interface ClientWithBalance {
   id: number;
@@ -17,10 +18,10 @@ interface ClientWithBalance {
 }
 
 async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
-  // Obtener clientes con cuenta corriente
+  // Obtener clientes con cuenta corriente (incluir saldo inicial)
   const { data: entities } = await supabase
     .from('mercure_entities')
-    .select('id, legal_name, tax_id, address, phone, email, payment_terms')
+    .select('id, legal_name, tax_id, address, phone, email, payment_terms, initial_balance')
     .eq('payment_terms', 'cuenta_corriente')
     .order('legal_name');
 
@@ -45,11 +46,15 @@ async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
     const entityShipments = (shipments || []).filter(s => s.sender_id === entity.id);
     const pendingCount = entityShipments.length;
     
-    // Saldo = suma de (flete + seguro) de cada envío
-    const balance = entityShipments.reduce((acc, s) => {
+    // Saldo de remitos = suma de (flete + seguro) de cada envío
+    const shipmentsBalance = entityShipments.reduce((acc, s) => {
       const value = s.declared_value || 0;
       return acc + (value * 0.05) + (value * 0.008);
     }, 0);
+    
+    // Saldo total = saldo inicial (histórico) + saldo de remitos nuevos
+    const initialBalance = Number(entity.initial_balance) || 0;
+    const balance = initialBalance + shipmentsBalance;
 
     const lastSettlement = (settlements || []).find(s => s.entity_id === entity.id);
 
@@ -107,6 +112,11 @@ export default async function CuentasCorrientesPage() {
           {/* Header */}
           <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
             <h1 className="text-lg font-medium text-neutral-900">Cuentas Corrientes</h1>
+            <Link href="/cuentas-corrientes/saldos-iniciales">
+              <button className="h-8 px-3 text-sm border border-neutral-200 hover:bg-neutral-50 rounded">
+                Saldos Iniciales
+              </button>
+            </Link>
           </div>
 
           {/* Stats */}
