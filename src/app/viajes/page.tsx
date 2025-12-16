@@ -5,11 +5,17 @@ import { TRIP_STATUS_LABELS } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { requireAuth } from "@/lib/auth";
 import Link from "next/link";
+import { Truck, Package } from "lucide-react";
 
 async function getTrips() {
   const { data } = await supabase
     .from('mercure_trips')
-    .select(`*, vehicle:mercure_vehicles(identifier, tractor_license_plate)`)
+    .select(`
+      *, 
+      vehicle:mercure_vehicles(identifier, tractor_license_plate),
+      client:mercure_entities!trips_client_id_fkey(legal_name),
+      supplier:mercure_entities!trips_supplier_id_fkey(legal_name)
+    `)
     .order('created_at', { ascending: false })
     .limit(100);
   return data || [];
@@ -23,6 +29,15 @@ function getStatusVariant(status: string): "default" | "success" | "warning" | "
     case 'cancelled': return 'error';
     default: return 'default';
   }
+}
+
+function formatCurrency(value: number | null): string {
+  if (!value) return '-';
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 0,
+  }).format(value);
 }
 
 export default async function ViajesPage() {
@@ -46,47 +61,76 @@ export default async function ViajesPage() {
 
           <div className="border border-neutral-200 rounded overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[800px]">
+              <table className="w-full text-sm min-w-[900px]">
                 <thead>
                   <tr className="bg-neutral-50 border-b border-neutral-200">
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">ID</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Origen</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Destino</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Tipo</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Ruta</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Cliente</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Vehículo</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Patente</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Salida</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Llegada</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Precio</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Estado</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Notas</th>
                   </tr>
                 </thead>
                 <tbody>
                   {trips.length === 0 ? (
-                    <tr><td colSpan={9} className="px-3 py-8 text-center text-neutral-400">Sin viajes</td></tr>
+                    <tr><td colSpan={8} className="px-3 py-8 text-center text-neutral-400">Sin viajes</td></tr>
                   ) : (
-                    trips.map((t: Record<string, unknown>) => (
-                      <tr key={t.id as number} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
-                        <td className="px-3 py-2">
-                          <Link href={`/viajes/${t.id}`} className="font-mono text-orange-500 hover:underline">#{String(t.id)}</Link>
-                        </td>
-                        <td className="px-3 py-2">{t.origin as string}</td>
-                        <td className="px-3 py-2">{t.destination as string}</td>
-                        <td className="px-3 py-2 text-neutral-600">{(t.vehicle as { identifier: string })?.identifier || '-'}</td>
-                        <td className="px-3 py-2 font-mono text-neutral-500 text-xs">{(t.vehicle as { tractor_license_plate: string })?.tractor_license_plate || '-'}</td>
-                        <td className="px-3 py-2 text-neutral-600 text-xs whitespace-nowrap">
-                          {t.departure_time ? new Date(t.departure_time as string).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
-                        </td>
-                        <td className="px-3 py-2 text-neutral-600 text-xs whitespace-nowrap">
-                          {t.arrival_time ? new Date(t.arrival_time as string).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
-                        </td>
-                        <td className="px-3 py-2">
-                          <Badge variant={getStatusVariant(t.status as string)}>
-                            {TRIP_STATUS_LABELS[(t.status as keyof typeof TRIP_STATUS_LABELS)] || t.status as string}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-2 text-neutral-400 text-xs truncate max-w-[100px]">{(t.notes as string) || '-'}</td>
-                      </tr>
-                    ))
+                    trips.map((t: Record<string, unknown>) => {
+                      const isFTL = t.trip_type === 'camion_completo';
+                      return (
+                        <tr key={t.id as number} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
+                          <td className="px-3 py-2">
+                            <Link href={`/viajes/${t.id}`} className="font-mono text-orange-500 hover:underline">#{String(t.id)}</Link>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                              {isFTL ? (
+                                <Truck className="w-4 h-4 text-orange-500" />
+                              ) : (
+                                <Package className="w-4 h-4 text-blue-500" />
+                              )}
+                              <span className="text-xs text-neutral-600">
+                                {isFTL ? 'FTL' : 'Cons.'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            <span className="font-medium">{t.origin as string}</span>
+                            <span className="text-neutral-400"> → </span>
+                            <span>{t.destination as string}</span>
+                          </td>
+                          <td className="px-3 py-2 text-neutral-600 truncate max-w-[150px]">
+                            {isFTL ? (
+                              (t.client as { legal_name: string })?.legal_name || '-'
+                            ) : (
+                              <span className="text-neutral-400 text-xs">Varios</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="text-neutral-600 text-xs">
+                              {(t.vehicle as { identifier: string })?.identifier || '-'}
+                            </div>
+                            <div className="font-mono text-neutral-400 text-[10px]">
+                              {(t.vehicle as { tractor_license_plate: string })?.tractor_license_plate || ''}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-neutral-600 text-xs whitespace-nowrap">
+                            {t.departure_time ? new Date(t.departure_time as string).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
+                          </td>
+                          <td className="px-3 py-2 font-medium">
+                            {isFTL ? formatCurrency(t.agreed_price as number) : '-'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Badge variant={getStatusVariant(t.status as string)}>
+                              {TRIP_STATUS_LABELS[(t.status as keyof typeof TRIP_STATUS_LABELS)] || t.status as string}
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
