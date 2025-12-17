@@ -4,7 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+const mercure = () => supabaseClient.schema('mercure');
 
 // Tipos de camino de pricing
 type PricingPath = 'A' | 'B' | 'C';
@@ -143,8 +144,8 @@ export async function POST(request: NextRequest) {
     let client = null;
     
     if (clientId) {
-      const { data } = await supabase
-        .from('mercure_entities')
+      const { data } = await mercure()
+        .from('entities')
         .select('id, legal_name, tax_id, client_type, payment_terms, assigned_tariff_id')
         .eq('id', clientId)
         .single();
@@ -152,8 +153,8 @@ export async function POST(request: NextRequest) {
     }
     
     if (!client && recipientCuit) {
-      const { data } = await supabase
-        .from('mercure_entities')
+      const { data } = await mercure()
+        .from('entities')
         .select('id, legal_name, tax_id, client_type, payment_terms, assigned_tariff_id')
         .eq('tax_id', recipientCuit)
         .single();
@@ -161,8 +162,8 @@ export async function POST(request: NextRequest) {
     }
     
     if (!client && recipientName) {
-      const { data } = await supabase
-        .from('mercure_entities')
+      const { data } = await mercure()
+        .from('entities')
         .select('id, legal_name, tax_id, client_type, payment_terms, assigned_tariff_id')
         .ilike('legal_name', `%${recipientName}%`)
         .limit(1)
@@ -173,8 +174,8 @@ export async function POST(request: NextRequest) {
     // Verificar términos comerciales
     let hasCommercialTerms = false;
     if (client) {
-      const { data: terms } = await supabase
-        .from('mercure_client_commercial_terms')
+      const { data: terms } = await mercure()
+        .from('client_commercial_terms')
         .select('id')
         .eq('entity_id', client.id)
         .single();
@@ -250,8 +251,8 @@ async function buscarTarifa(
   // Intentar encontrar tarifa con origen y destino
   for (const orig of originsToTry) {
     for (const dest of destinationsToTry) {
-      const { data: tariff, error } = await supabase
-        .from('mercure_tariffs')
+      const { data: tariff, error } = await mercure()
+        .from('tariffs')
         .select('*')
         .ilike('origin', orig)
         .ilike('destination', dest)
@@ -273,8 +274,8 @@ async function buscarTarifa(
   // Fallback: buscar cualquier tarifa que cubra el peso (sin filtrar origen/destino)
   console.log(`[detect-pricing] No hay tarifa específica para ${origin}->${destination}, buscando genérica...`);
   
-  const { data: fallbackTariff } = await supabase
-    .from('mercure_tariffs')
+  const { data: fallbackTariff } = await mercure()
+    .from('tariffs')
     .select('*')
     .neq('tariff_type', 'volume')
     .gte('weight_to_kg', weightBucket)
@@ -329,8 +330,8 @@ async function handlePathA(
 ): Promise<PricingResult> {
   
   // Buscar términos comerciales del cliente
-  const { data: terms } = await supabase
-    .from('mercure_client_commercial_terms')
+  const { data: terms } = await mercure()
+    .from('client_commercial_terms')
     .select('*')
     .eq('entity_id', client.id)
     .eq('is_active', true)
@@ -667,8 +668,8 @@ async function handlePathC(
 // Buscar cotización pendiente
 async function findPendingQuotation(cuit?: string, name?: string, destination?: string) {
   if (cuit) {
-    const { data } = await supabase
-      .from('mercure_quotations')
+    const { data } = await mercure()
+      .from('quotations')
       .select('*')
       .eq('customer_cuit', cuit)
       .eq('status', 'pending')
@@ -684,8 +685,8 @@ async function findPendingQuotation(cuit?: string, name?: string, destination?: 
     const destinationsToTry = normalizeCity(destination);
     
     for (const dest of destinationsToTry) {
-      const { data } = await supabase
-        .from('mercure_quotations')
+      const { data } = await mercure()
+        .from('quotations')
         .select('*')
         .ilike('customer_name', `%${name}%`)
         .ilike('destination', `%${dest}%`)

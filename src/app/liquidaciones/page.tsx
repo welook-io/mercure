@@ -1,6 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { FileText, Plus, TrendingUp, Clock, CheckCircle } from "lucide-react";
@@ -17,8 +17,8 @@ const SETTLEMENT_STATUS_LABELS: Record<string, string> = {
 
 async function getSettlements() {
   const { data } = await supabase
-    .from('mercure_client_settlements')
-    .select(`*, entity:mercure_entities(id, legal_name, tax_id)`)
+    .schema('mercure').from('client_settlements')
+    .select(`*, entity:entities(id, legal_name, tax_id)`)
     .order('settlement_date', { ascending: false })
     .limit(50);
   return data || [];
@@ -26,7 +26,7 @@ async function getSettlements() {
 
 async function getStats() {
   const { data: settlements } = await supabase
-    .from('mercure_client_settlements')
+    .schema('mercure').from('client_settlements')
     .select('status, total_amount');
   
   if (!settlements) return { total: 0, generadas: 0, conformadas: 0, pendientes: 0, montoTotal: 0 };

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { updateEntity, upsertCommercialTerms, deleteCommercialTerms } from "./actions";
 import { Loader2, Save, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -76,7 +76,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
     try {
       // Actualizar entidad solo con campos que existen
       const { error: updateError } = await supabase
-        .from('mercure_entities')
+        .schema('mercure').from('entities')
         .update({
           legal_name: formData.legal_name,
           tax_id: formData.tax_id || null,
@@ -105,7 +105,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
         if (commercialTerms) {
           // Actualizar existente
           const { error: termsError } = await supabase
-            .from('mercure_client_commercial_terms')
+            .schema('mercure').from('client_commercial_terms')
             .update(termsData)
             .eq('id', commercialTerms.id);
           
@@ -113,7 +113,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
         } else {
           // Crear nuevo
           const { error: termsError } = await supabase
-            .from('mercure_client_commercial_terms')
+            .schema('mercure').from('client_commercial_terms')
             .insert(termsData);
           
           if (termsError) throw new Error(termsError.message);
@@ -121,7 +121,7 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
       } else if (commercialTerms) {
         // Si se deshabilitó, eliminar los términos
         const { error: deleteError } = await supabase
-          .from('mercure_client_commercial_terms')
+          .schema('mercure').from('client_commercial_terms')
           .delete()
           .eq('id', commercialTerms.id);
         

@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el viaje existe
     const { data: trip, error: tripError } = await supabaseAdmin
-      .from('mercure_trips')
+      .schema('mercure').from('trips')
       .select('id, status')
       .eq('id', tripId)
       .single();
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar que tiene envíos asignados
     const { data: shipments } = await supabaseAdmin
-      .from('mercure_shipments')
+      .schema('mercure').from('shipments')
       .select('id')
       .eq('trip_id', tripId);
 
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Actualizar viaje a en_transito
     const { error: updateTripError } = await supabaseAdmin
-      .from('mercure_trips')
+      .schema('mercure').from('trips')
       .update({
         status: 'in_transit',
         departure_time: new Date().toISOString()
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     // Actualizar todos los envíos a en_transito
     const { error: updateShipmentsError } = await supabaseAdmin
-      .from('mercure_shipments')
+      .schema('mercure').from('shipments')
       .update({ status: 'en_transito' })
       .eq('trip_id', tripId);
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     // Registrar evento
     await supabaseAdmin
-      .from('mercure_events')
+      .schema('mercure').from('events')
       .insert({
         event_type: 'trip_dispatched',
         trip_id: tripId,

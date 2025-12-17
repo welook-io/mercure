@@ -13,7 +13,10 @@ import {
 // Usar supabaseAdmin para bypasear RLS (solo server-side)
 const supabase = supabaseAdmin!;
 
-// Obtener permisos del usuario desde mercure_user_permissions
+// Helper para queries al schema mercure
+const mercure = () => supabase.schema('mercure');
+
+// Obtener permisos del usuario desde user_permissions
 export async function getUserPermissions(userId: string): Promise<UserPermissions> {
   const { data, error } = await supabase
     .from('mercure_user_permissions')
@@ -171,7 +174,7 @@ export async function requirePermission(permission: Permission) {
 // ============================================================================
 
 export async function getUserRole(userId: string): Promise<string | null> {
-  // Buscar el rol del usuario en mercure_user_roles (legacy)
+  // Buscar el rol del usuario en user_roles (legacy)
   const { data, error } = await supabase
     .from('mercure_user_roles')
     .select('role')
@@ -212,7 +215,7 @@ export async function getCurrentUserRole(): Promise<{ role: string | null; email
     return { role: null, email: userEmail, userId };
   }
 
-  // Buscar rol en mercure_user_roles (legacy)
+  // Buscar rol en user_roles (legacy)
   const { data: roleData } = await supabase
     .from("mercure_user_roles")
     .select("role")

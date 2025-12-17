@@ -1,24 +1,59 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { requireAuth } from "@/lib/auth";
 import Link from "next/link";
 import { ShipmentList } from "./shipment-list";
 
 async function getRecentShipments() {
-  const { data } = await supabase
-    .from('mercure_shipments')
-    .select(`
-      *,
-      sender:mercure_entities!sender_id(legal_name),
-      recipient:mercure_entities!recipient_id(legal_name),
-      quotation:mercure_quotations!mercure_shipments_quotation_id_fkey(total_price)
-    `)
-    .in('status', ['received', 'in_warehouse', 'ingresada'])
-    .is('trip_id', null)
+  // Primero obtener los shipments sin relaciones
+  const { data: shipments, error } = await supabaseAdmin!
+    .schema('mercure')
+    .from('shipments')
+    .select('*')
+    .in('status', ['received', 'in_warehouse', 'ingresada', 'pending', 'draft'])
     .order('created_at', { ascending: false })
     .limit(50);
-  return data || [];
+  
+  if (error) {
+    console.error("Error fetching shipments:", error);
+    return [];
+  }
+
+  if (!shipments || shipments.length === 0) {
+    return [];
+  }
+
+  // Obtener los IDs únicos de sender y recipient
+  const senderIds = [...new Set(shipments.map(s => s.sender_id).filter(Boolean))];
+  const recipientIds = [...new Set(shipments.map(s => s.recipient_id).filter(Boolean))];
+  const quotationIds = [...new Set(shipments.map(s => s.quotation_id).filter(Boolean))];
+  const allEntityIds = [...new Set([...senderIds, ...recipientIds])];
+
+  // Obtener entidades
+  const { data: entities } = await supabaseAdmin!
+    .schema('mercure')
+    .from('entities')
+    .select('id, legal_name')
+    .in('id', allEntityIds.length > 0 ? allEntityIds : [0]);
+
+  // Obtener cotizaciones
+  const { data: quotations } = await supabaseAdmin!
+    .schema('mercure')
+    .from('quotations')
+    .select('id, total_price')
+    .in('id', quotationIds.length > 0 ? quotationIds : [0]);
+
+  const entitiesMap = new Map((entities || []).map(e => [e.id, e]));
+  const quotationsMap = new Map((quotations || []).map(q => [q.id, q]));
+
+  // Combinar datos
+  return shipments.map(s => ({
+    ...s,
+    sender: s.sender_id ? entitiesMap.get(s.sender_id) || null : null,
+    recipient: s.recipient_id ? entitiesMap.get(s.recipient_id) || null : null,
+    quotation: s.quotation_id ? quotationsMap.get(s.quotation_id) || null : null,
+  }));
 }
 
 export default async function RecepcionPage() {

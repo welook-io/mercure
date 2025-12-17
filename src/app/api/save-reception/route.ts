@@ -12,6 +12,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
     persistSession: false
   }
 });
+const mercure = () => supabaseAdmin.schema('mercure');
 
 interface ReceptionData {
   deliveryNoteNumber: string;
@@ -54,8 +55,8 @@ async function findOrCreateEntity(entityData: EntityData): Promise<number> {
 
   // Buscar por CUIT si existe
   if (cuit && cuit.trim() !== '') {
-    const { data: existingByCuit } = await supabaseAdmin
-      .from('mercure_entities')
+    const { data: existingByCuit } = await mercure()
+      .from('entities')
       .select('id')
       .eq('tax_id', cuit.trim())
       .single();
@@ -66,8 +67,8 @@ async function findOrCreateEntity(entityData: EntityData): Promise<number> {
   }
 
   // Buscar por nombre
-  const { data: existingByName } = await supabaseAdmin
-    .from('mercure_entities')
+  const { data: existingByName } = await mercure()
+    .from('entities')
     .select('id')
     .ilike('legal_name', name.trim())
     .single();
@@ -77,8 +78,8 @@ async function findOrCreateEntity(entityData: EntityData): Promise<number> {
   }
 
   // Crear nueva entidad con todos los campos
-  const { data: newEntity, error } = await supabaseAdmin
-    .from('mercure_entities')
+  const { data: newEntity, error } = await mercure()
+    .from('entities')
     .insert({
       legal_name: name.trim(),
       tax_id: cuit?.trim() || null,
@@ -205,8 +206,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear el shipment
-    const { data: shipment, error: shipmentError } = await supabaseAdmin
-      .from('mercure_shipments')
+    const { data: shipment, error: shipmentError } = await mercure()
+      .from('shipments')
       .insert({
         delivery_note_number: data.deliveryNoteNumber?.trim() || null,
         status: 'ingresada',
@@ -236,8 +237,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear evento de recepción
-    await supabaseAdmin
-      .from('mercure_events')
+    await mercure()
+      .from('events')
       .insert({
         event_type: 'shipment_received',
         shipment_id: shipment.id,
@@ -282,8 +283,8 @@ export async function POST(request: NextRequest) {
           
           if (pricing?.price && pricing.price > 0) {
             // Guardar la cotización
-            const { data: quotation, error: quotationError } = await supabaseAdmin
-              .from('mercure_quotations')
+            const { data: quotation, error: quotationError } = await mercure()
+              .from('quotations')
               .insert({
                 shipment_id: shipment.id,
                 entity_id: recipientId,
@@ -312,8 +313,8 @@ export async function POST(request: NextRequest) {
               quotationId = quotation.id;
               
               // Actualizar el shipment con el quotation_id
-              await supabaseAdmin
-                .from('mercure_shipments')
+              await mercure()
+                .from('shipments')
                 .update({ quotation_id: quotationId })
                 .eq('id', shipment.id);
             } else {

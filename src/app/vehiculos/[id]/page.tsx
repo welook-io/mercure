@@ -1,5 +1,5 @@
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { requireAuth } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import VehicleDetailClient from "./client";
@@ -41,7 +41,7 @@ interface VehicleEvent {
 
 async function getVehicle(id: string): Promise<Vehicle | null> {
   const { data } = await supabase
-    .from('mercure_vehicles')
+    .schema('mercure').from('vehicles')
     .select('*')
     .eq('id', id)
     .single();
@@ -50,7 +50,7 @@ async function getVehicle(id: string): Promise<Vehicle | null> {
 
 async function getVehicleEvents(vehicleId: string): Promise<VehicleEvent[]> {
   const { data } = await supabase
-    .from('mercure_vehicle_events')
+    .schema('mercure').from('vehicle_events')
     .select('*')
     .eq('vehicle_id', vehicleId)
     .order('event_date', { ascending: false });

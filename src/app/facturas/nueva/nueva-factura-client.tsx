@@ -82,7 +82,7 @@ export function NuevaFacturaClient() {
     async function loadClientes() {
       setLoading(true);
       const { data, error } = await supabase
-        .from('mercure_entities')
+        .schema('mercure').from('entities')
         .select('id, legal_name, tax_id')
         .not('tax_id', 'is', null)
         .order('legal_name');
@@ -105,7 +105,7 @@ export function NuevaFacturaClient() {
 
       setLoadingRemitos(true);
       const { data, error } = await supabase
-        .from('mercure_shipments')
+        .schema('mercure').from('shipments')
         .select(`
           id,
           delivery_note_number,
@@ -114,7 +114,7 @@ export function NuevaFacturaClient() {
           volume_m3,
           declared_value,
           quotation_id,
-          recipient:mercure_entities!shipments_recipient_id_fkey(legal_name)
+          recipient:entities!shipments_recipient_id_fkey(legal_name)
         `)
         .eq('sender_id', selectedClienteId)
         .is('invoice_id', null)
@@ -127,7 +127,7 @@ export function NuevaFacturaClient() {
             let precio = 0;
             if (r.quotation_id) {
               const { data: q } = await supabase
-                .from('mercure_quotations')
+                .schema('mercure').from('quotations')
                 .select('total_price')
                 .eq('id', r.quotation_id)
                 .single();

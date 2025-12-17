@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Package, Truck, Check, Loader2, ChevronDown, MapPin } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { timeAgo } from "@/lib/utils";
 
 interface Shipment {
@@ -56,18 +56,18 @@ export default function ConsolidacionPage() {
     
     const [shipmentsRes, viajesRes] = await Promise.all([
       supabase
-        .from('mercure_shipments')
+        .schema('mercure').from('shipments')
         .select(`
           id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,
           declared_value, created_at, recipient_address,
-          sender:mercure_entities!sender_id(legal_name), 
-          recipient:mercure_entities!recipient_id(legal_name)
+          sender:entities!sender_id(legal_name), 
+          recipient:entities!recipient_id(legal_name)
         `)
         .in('status', ['ingresada', 'received', 'in_warehouse'])
         .is('trip_id', null)
         .order('created_at', { ascending: false }),
       supabase
-        .from('mercure_trips')
+        .schema('mercure').from('trips')
         .select('id, origin, destination, departure_date, status')
         .in('status', ['planned', 'loading'])
         .order('departure_date', { ascending: true })

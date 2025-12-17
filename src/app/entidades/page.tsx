@@ -26,10 +26,11 @@ async function getEntities(): Promise<EntityWithTerms[]> {
   if (!supabaseAdmin) return [];
   
   const { data } = await supabaseAdmin
-    .from('mercure_entities')
+    .schema('mercure')
+    .from('entities')
     .select(`
       id, legal_name, tax_id, entity_type, payment_terms, email, phone, address,
-      commercial_terms:mercure_client_commercial_terms(tariff_modifier, insurance_rate, credit_days)
+      commercial_terms:client_commercial_terms(tariff_modifier, insurance_rate, credit_days)
     `)
     .order('legal_name', { ascending: true });
   

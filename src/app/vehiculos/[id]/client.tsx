@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
+import { updateVehicle, createVehicleEvent, deleteVehicleEvent } from "./actions";
 import Link from "next/link";
 import { ArrowLeft, Truck, Save, Calendar, Gauge, Plus, Wrench, FileCheck, ShoppingCart, AlertTriangle, Trash2, X, Bell, Clock, Car } from "lucide-react";
 
@@ -164,7 +164,7 @@ export default function VehicleDetailClient({ vehicle, initialEvents }: Props) {
     setError(null);
     setSuccess(null);
     try {
-      const { error: updateError } = await supabase.from('mercure_vehicles').update({
+      await updateVehicle(vehicle.id, {
         identifier: formData.identifier.toUpperCase(),
         brand: formData.brand || null,
         model: formData.model || null,
@@ -174,14 +174,13 @@ export default function VehicleDetailClient({ vehicle, initialEvents }: Props) {
         trailer_license_plate: formData.trailer_license_plate.toUpperCase() || null,
         pallet_capacity: formData.pallet_capacity ? parseInt(formData.pallet_capacity) : null,
         weight_capacity_kg: formData.weight_capacity_kg ? parseFloat(formData.weight_capacity_kg) : null,
+        current_km: null,
         purchase_date: formData.purchase_date || null,
         purchase_km: formData.purchase_km ? parseInt(formData.purchase_km) : null,
         purchase_condition: formData.purchase_condition,
         is_active: formData.is_active,
         notes: formData.notes || null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', vehicle.id);
-      if (updateError) throw updateError;
+      });
       setSuccess("Vehículo actualizado");
       setEditMode(false);
       router.refresh();
@@ -198,7 +197,7 @@ export default function VehicleDetailClient({ vehicle, initialEvents }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: insertError } = await supabase.from('mercure_vehicle_events').insert({
+      const data = await createVehicleEvent({
         vehicle_id: vehicle.id,
         event_type: newEvent.event_type,
         event_date: newEvent.event_date,
@@ -208,8 +207,7 @@ export default function VehicleDetailClient({ vehicle, initialEvents }: Props) {
         description: newEvent.description || null,
         next_date: newEvent.next_date || null,
         next_km: newEvent.next_km ? parseInt(newEvent.next_km) : null,
-      }).select().single();
-      if (insertError) throw insertError;
+      });
       setEvents([data as VehicleEvent, ...events]);
       setShowEventForm(false);
       setNewEvent({ event_type: "chequeo_km", event_date: new Date().toISOString().split('T')[0], km_at_event: "", cost: "", provider: "", description: "", next_date: "", next_km: "" });
@@ -225,8 +223,7 @@ export default function VehicleDetailClient({ vehicle, initialEvents }: Props) {
   const handleDeleteEvent = async (eventId: number) => {
     if (!confirm("¿Eliminar este evento?")) return;
     try {
-      const { error } = await supabase.from('mercure_vehicle_events').delete().eq('id', eventId);
-      if (error) throw error;
+      await deleteVehicleEvent(eventId);
       setEvents(events.filter(e => e.id !== eventId));
     } catch (err) {
       console.error(err);

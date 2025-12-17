@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { 
   X, 
   Package, 
@@ -55,11 +55,12 @@ export default function CentrosLogisticosPage() {
     try {
       // Obtener envíos por estado
       const { data: shipments } = await supabase
-        .from("mercure_shipments")
+        .schema("mercure")
+        .from("shipments")
         .select(`
           id, delivery_note_number, status, package_quantity, weight_kg,
-          sender:mercure_entities!sender_id(legal_name),
-          recipient:mercure_entities!recipient_id(legal_name),
+          sender:entities!sender_id(legal_name),
+          recipient:entities!recipient_id(legal_name),
           trip_id
         `)
         .in("status", [
@@ -69,10 +70,11 @@ export default function CentrosLogisticosPage() {
 
       // Obtener viajes activos
       const { data: trips } = await supabase
-        .from("mercure_trips")
+        .schema("mercure")
+        .from("trips")
         .select(`
           id, origin, destination, status, departure_date,
-          vehicle:mercure_vehicles(plate)
+          vehicle:vehicles(plate)
         `)
         .in("status", ["loading", "in_transit", "arrived"]);
 

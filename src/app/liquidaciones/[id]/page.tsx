@@ -1,5 +1,5 @@
 import { requireAuth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Check, X, Printer } from "lucide-react";
@@ -18,8 +18,8 @@ const SETTLEMENT_STATUS_LABELS: Record<string, string> = {
 
 async function getSettlement(id: string) {
   const { data } = await supabase
-    .from('mercure_client_settlements')
-    .select(`*, entity:mercure_entities(id, legal_name, tax_id, address, phone, email)`)
+    .schema('mercure').from('client_settlements')
+    .select(`*, entity:entities(id, legal_name, tax_id, address, phone, email)`)
     .eq('id', id)
     .single();
   return data;
@@ -27,7 +27,7 @@ async function getSettlement(id: string) {
 
 async function getSettlementItems(settlementId: string) {
   const { data } = await supabase
-    .from('mercure_settlement_items')
+    .schema('mercure').from('settlement_items')
     .select('*')
     .eq('settlement_id', settlementId)
     .order('sort_order', { ascending: true });

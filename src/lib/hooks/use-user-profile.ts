@@ -87,7 +87,7 @@ export function useUserProfile(): UserProfileData {
           return;
         }
 
-        // Buscar los permisos en mercure_user_permissions
+        // Buscar los permisos en mercure_user_permissions (schema public)
         const { data: permissionsData, error: permError } = await supabase
           .from("mercure_user_permissions")
           .select("permission, has_access")

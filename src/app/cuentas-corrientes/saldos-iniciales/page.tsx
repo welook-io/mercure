@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { Loader2, Save, ArrowLeft, DollarSign, Search } from "lucide-react";
 import Link from "next/link";
 
@@ -39,7 +39,7 @@ export default function SaldosInicialesPage() {
 
   async function loadEntities() {
     const { data } = await supabase
-      .from('mercure_entities')
+      .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, initial_balance, initial_balance_date, payment_terms')
       .order('legal_name');
     
@@ -82,7 +82,7 @@ export default function SaldosInicialesPage() {
 
       for (const update of updates) {
         const { error } = await supabase
-          .from('mercure_entities')
+          .schema('mercure').from('entities')
           .update({
             initial_balance: update.initial_balance,
             initial_balance_date: update.initial_balance_date,

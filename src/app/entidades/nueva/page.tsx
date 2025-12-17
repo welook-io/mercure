@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { Loader2, Save, ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 
@@ -58,7 +58,7 @@ export default function NuevaEntidadPage() {
     try {
       // Crear entidad solo con campos que existen
       const { data: newEntity, error: insertError } = await supabase
-        .from('mercure_entities')
+        .schema('mercure').from('entities')
         .insert({
           legal_name: formData.legal_name,
           tax_id: formData.tax_id || null,
@@ -86,7 +86,7 @@ export default function NuevaEntidadPage() {
         };
 
         const { error: termsError } = await supabase
-          .from('mercure_client_commercial_terms')
+          .schema('mercure').from('client_commercial_terms')
           .insert(termsData);
         
         if (termsError) throw new Error(termsError.message);

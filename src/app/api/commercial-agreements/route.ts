@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Crear la solicitud
     const { data, error } = await supabase
-      .from('mercure_commercial_agreement_requests')
+      .schema('mercure').from('commercial_agreement_requests')
       .insert({
         entity_id: entityId || null,
         // Cliente nuevo
@@ -89,10 +89,10 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const { data, error } = await supabase
-      .from('mercure_commercial_agreement_requests')
+      .schema('mercure').from('commercial_agreement_requests')
       .select(`
         *,
-        entity:mercure_entities(id, legal_name, tax_id)
+        entity:entities(id, legal_name, tax_id)
       `)
       .order('created_at', { ascending: false });
 

@@ -1,12 +1,12 @@
 import { requireAuth } from "@/lib/auth";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { FacturaTestClient } from "./factura-test-client";
 
 async function getHiperplacaData() {
   // Obtener datos de HIPERPLACA
   const { data: entity, error } = await supabase
-    .from('mercure_entities')
+    .schema('mercure').from('entities')
     .select('*')
     .ilike('legal_name', '%HIPERPLACA%')
     .single();

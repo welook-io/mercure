@@ -5,7 +5,7 @@
 
 import * as forge from 'node-forge';
 import { WSAACredentials } from './types';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from "@/lib/supabase";
 
 let cachedCredentials: Record<string, WSAACredentials> = {};
 let cachedAfipConfig: { cert: string; key: string; cuit: string; environment: 'testing' | 'production' } | null = null;
@@ -19,13 +19,14 @@ async function getAfipConfig(): Promise<{ cert: string; key: string; cuit: strin
   }
 
   const { data, error } = await supabase
-    .from('mercure_afip_config')
+    .schema('mercure')
+    .from('afip_config')
     .select('certificate, private_key, cuit, environment')
     .eq('is_active', true)
     .single();
 
   if (error || !data) {
-    throw new Error('Configuración de AFIP no encontrada en Supabase. Sube los certificados en la tabla mercure_afip_config.');
+    throw new Error('Configuración de AFIP no encontrada en Supabase. Sube los certificados en la tabla mercure.afip_config.');
   }
 
   cachedAfipConfig = {

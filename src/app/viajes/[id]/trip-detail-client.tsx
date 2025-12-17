@@ -110,7 +110,7 @@ export function TripDetailClient({
       }
 
       const { data, error: insertError } = await supabase
-        .from('mercure_shipments')
+        .schema('mercure').from('shipments')
         .insert({
           delivery_note_number: formData.delivery_note_number,
           sender_id: parseInt(formData.sender_id),
@@ -127,8 +127,8 @@ export function TripDetailClient({
         })
         .select(`
           *,
-          sender:mercure_entities!shipments_sender_id_fkey(id, legal_name),
-          recipient:mercure_entities!shipments_recipient_id_fkey(id, legal_name)
+          sender:entities!shipments_sender_id_fkey(id, legal_name),
+          recipient:entities!shipments_recipient_id_fkey(id, legal_name)
         `)
         .single();
 

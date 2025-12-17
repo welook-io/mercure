@@ -67,7 +67,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
     async function loadQuotation() {
       if (shipment.quotation_id) {
         const { data } = await supabase
-          .from('mercure_quotations')
+          .schema('mercure').from('quotations')
           .select('total_price, base_price, insurance_cost')
           .eq('id', shipment.quotation_id)
           .single();
@@ -174,7 +174,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
       // Actualizar en la base de datos
       const updateField = type === 'remito' ? 'remito_image_url' : 'cargo_image_url';
       const { error: updateError } = await supabase
-        .from('mercure_shipments')
+        .schema('mercure').from('shipments')
         .update({ [updateField]: publicUrl })
         .eq('id', shipment.id);
 
@@ -203,7 +203,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
 
     try {
       const { error } = await supabase
-        .from('mercure_shipments')
+        .schema('mercure').from('shipments')
         .delete()
         .eq('id', shipment.id);
 
@@ -251,7 +251,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
         
         // Crear nueva cotización
         const { data: newQuot, error: quotError } = await supabase
-          .from('mercure_quotations')
+          .schema('mercure').from('quotations')
           .insert({
             shipment_id: shipment.id,
             entity_id: formData.recipient_id ? parseInt(formData.recipient_id) : null,
@@ -282,7 +282,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
       }
 
       const { error } = await supabase
-        .from('mercure_shipments')
+        .schema('mercure').from('shipments')
         .update(updateData)
         .eq('id', shipment.id);
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from "@/lib/supabase";
 import { createInvoice, getLastVoucherNumber } from '@/lib/afip/wsfe';
 import { CONCEPT_CODES, DOC_TYPE_CODES, InvoiceType } from '@/lib/afip/types';
 
@@ -17,8 +17,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: settlement, error: settlementError } = await supabase
-      .from('mercure_client_settlements')
-      .select(`*, entity:mercure_entities(id, legal_name, tax_id, address)`)
+      .schema('mercure').from('client_settlements')
+      .select(`*, entity:entities(id, legal_name, tax_id, address)`)
       .eq('id', settlement_id)
       .single();
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     const caeExpirationFormatted = caeExp ? `${caeExp.slice(0, 4)}-${caeExp.slice(4, 6)}-${caeExp.slice(6, 8)}` : null;
 
     await supabase
-      .from('mercure_client_settlements')
+      .schema('mercure').from('client_settlements')
       .update({
         status: 'facturada',
         invoice_number: invoiceNumber,
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     // Guardar la factura en la tabla de facturas
     await supabase
-      .from('mercure_invoices')
+      .schema('mercure').from('invoices')
       .insert({
         invoice_number: invoiceNumber,
         invoice_type: invoice_type,

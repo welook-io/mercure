@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Obtener lista de clientes para contexto del LLM
     const { data: clients } = await supabaseAdmin
-      .from('mercure_entities')
+      .schema('mercure').from('entities')
       .select('id, legal_name, tax_id')
       .eq('entity_type', 'cliente')
       .order('legal_name');

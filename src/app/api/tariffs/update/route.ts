@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // Actualizar en la tabla física del schema mercure
     const { error } = await supabase
-      .from('mercure_tariffs')
+      .schema('mercure').from('tariffs')
       .update({ [field]: value })
       .eq('id', id);
 

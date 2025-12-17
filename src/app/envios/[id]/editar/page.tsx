@@ -1,12 +1,12 @@
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { requireAuth } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { EditShipmentForm } from "./edit-shipment-form";
 
 async function getShipmentData(id: number) {
   const { data: shipment } = await supabase
-    .from('mercure_shipments')
+    .schema('mercure').from('shipments')
     .select('*, quotation_id, remito_image_url, cargo_image_url')
     .eq('id', id)
     .single();
@@ -19,7 +19,7 @@ async function getShipmentData(id: number) {
 
   if (shipment.sender_id) {
     const { data } = await supabase
-      .from('mercure_entities')
+      .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.sender_id)
       .single();
@@ -28,7 +28,7 @@ async function getShipmentData(id: number) {
 
   if (shipment.recipient_id) {
     const { data } = await supabase
-      .from('mercure_entities')
+      .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.recipient_id)
       .single();
@@ -44,7 +44,7 @@ async function getShipmentData(id: number) {
 
 async function getEntities() {
   const { data } = await supabase
-    .from('mercure_entities')
+    .schema('mercure').from('entities')
     .select('id, legal_name, tax_id')
     .order('legal_name');
   return data || [];

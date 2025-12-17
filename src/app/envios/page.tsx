@@ -1,5 +1,5 @@
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { requireAuth } from "@/lib/auth";
 import { Truck, Plus } from "lucide-react";
 import { ShipmentTransitList } from "./shipment-transit-list";
@@ -34,14 +34,15 @@ function getTrip(trip: Shipment['trip']): { id: number; origin: string; destinat
 const TRANSITO_STATUSES = ['en_transito', 'in_transit', 'loaded'];
 
 async function getShipmentsEnTransito() {
-  const { data } = await supabase
-    .from('mercure_shipments')
+  const { data } = await supabaseAdmin!
+    .schema('mercure')
+    .from('shipments')
     .select(`
       id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,
       declared_value, paid_by, payment_terms, created_at, recipient_address, trip_id,
-      sender:mercure_entities!sender_id(legal_name), 
-      recipient:mercure_entities!recipient_id(legal_name),
-      trip:mercure_trips(id, origin, destination, departure_date)
+      sender:entities!sender_id(legal_name), 
+      recipient:entities!recipient_id(legal_name),
+      trip:trips(id, origin, destination, departure_date)
     `)
     .in('status', TRANSITO_STATUSES)
     .order('created_at', { ascending: false });

@@ -15,10 +15,10 @@ export async function GET(
     const { id } = await params;
     
     const { data, error } = await supabase
-      .from('mercure_commercial_agreement_requests')
+      .schema('mercure').from('commercial_agreement_requests')
       .select(`
         *,
-        entity:mercure_entities(id, legal_name, tax_id, address)
+        entity:entities(id, legal_name, tax_id, address)
       `)
       .eq('id', id)
       .single();
@@ -52,7 +52,7 @@ export async function PATCH(
 
     // Obtener solicitud actual
     const { data: agreement, error: fetchError } = await supabase
-      .from('mercure_commercial_agreement_requests')
+      .schema('mercure').from('commercial_agreement_requests')
       .select('*')
       .eq('id', id)
       .single();
@@ -68,7 +68,7 @@ export async function PATCH(
       }
 
       const { error } = await supabase
-        .from('mercure_commercial_agreement_requests')
+        .schema('mercure').from('commercial_agreement_requests')
         .update({
           status: 'approved',
           reviewed_by: userId,
@@ -93,7 +93,7 @@ export async function PATCH(
       }
 
       const { error } = await supabase
-        .from('mercure_commercial_agreement_requests')
+        .schema('mercure').from('commercial_agreement_requests')
         .update({
           status: 'rejected',
           reviewed_by: userId,
@@ -122,7 +122,7 @@ export async function PATCH(
       // Si es cliente nuevo, crearlo
       if (!entityId && agreement.new_entity_name) {
         const { data: newEntity, error: createError } = await supabase
-          .from('mercure_entities')
+          .schema('mercure').from('entities')
           .insert({
             legal_name: agreement.new_entity_name,
             tax_id: agreement.new_entity_cuit,
@@ -151,7 +151,7 @@ export async function PATCH(
 
         // Actualizar la solicitud con el entity_id
         await supabase
-          .from('mercure_commercial_agreement_requests')
+          .schema('mercure').from('commercial_agreement_requests')
           .update({ entity_id: entityId })
           .eq('id', id);
       }
@@ -160,13 +160,13 @@ export async function PATCH(
       if (entityId) {
         // Desactivar términos anteriores
         await supabase
-          .from('mercure_client_commercial_terms')
+          .schema('mercure').from('client_commercial_terms')
           .update({ is_active: false })
           .eq('entity_id', entityId);
 
         // Crear nuevos términos
         const { error: termsError } = await supabase
-          .from('mercure_client_commercial_terms')
+          .schema('mercure').from('client_commercial_terms')
           .insert({
             entity_id: entityId,
             credit_terms: agreement.requested_credit_terms,
@@ -189,7 +189,7 @@ export async function PATCH(
 
       // Marcar solicitud como configurada
       const { error: updateError } = await supabase
-        .from('mercure_commercial_agreement_requests')
+        .schema('mercure').from('commercial_agreement_requests')
         .update({
           status: 'configured',
           configured_by: userId,

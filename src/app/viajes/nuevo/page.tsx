@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { Loader2, Save, ArrowLeft, Truck, Package, MapPin, Building2, Calendar, DollarSign, Weight, Box } from "lucide-react";
 import Link from "next/link";
 
@@ -69,8 +69,8 @@ export default function NuevoViajePage() {
   useEffect(() => {
     async function loadData() {
       const [entitiesRes, vehiclesRes] = await Promise.all([
-        supabase.from('mercure_entities').select('id, legal_name, tax_id').order('legal_name'),
-        supabase.from('mercure_vehicles').select('id, identifier, tractor_license_plate').order('identifier'),
+        supabaseAdmin.schema('mercure').from('entities').select('id, legal_name, tax_id').order('legal_name'),
+        supabaseAdmin.schema('mercure').from('vehicles').select('id, identifier, tractor_license_plate').order('identifier'),
       ]);
       setEntities(entitiesRes.data || []);
       setVehicles(vehiclesRes.data || []);
@@ -115,7 +115,7 @@ export default function NuevoViajePage() {
       }
 
       const { data: newTrip, error: insertError } = await supabase
-        .from('mercure_trips')
+        .schema('mercure').from('trips')
         .insert(tripData)
         .select()
         .single();

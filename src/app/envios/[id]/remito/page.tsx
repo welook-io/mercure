@@ -8,7 +8,7 @@ async function getShipmentData(id: number) {
   if (!supabaseAdmin) return null;
   
   const { data: shipment } = await supabaseAdmin
-    .from('mercure_shipments')
+    .schema('mercure').from('shipments')
     .select('*')
     .eq('id', id)
     .single();
@@ -22,7 +22,7 @@ async function getShipmentData(id: number) {
 
   if (shipment.sender_id) {
     const { data } = await supabaseAdmin
-      .from('mercure_entities')
+      .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.sender_id)
       .single();
@@ -31,7 +31,7 @@ async function getShipmentData(id: number) {
 
   if (shipment.recipient_id) {
     const { data } = await supabaseAdmin
-      .from('mercure_entities')
+      .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.recipient_id)
       .single();
@@ -41,7 +41,7 @@ async function getShipmentData(id: number) {
   // Cargar cotización asociada
   if (shipment.quotation_id) {
     const { data } = await supabaseAdmin
-      .from('mercure_quotations')
+      .schema('mercure').from('quotations')
       .select('base_price, insurance_cost, total_price, includes_iva')
       .eq('id', shipment.quotation_id)
       .single();

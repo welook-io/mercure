@@ -1,7 +1,7 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { requireAuth } from "@/lib/auth";
 import { AGREEMENT_STATUS_LABELS, TARIFF_TYPE_LABELS, CREDIT_TERMS_LABELS } from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
@@ -29,11 +29,12 @@ interface AgreementRequest {
 }
 
 async function getAgreementRequests() {
-  const { data } = await supabase
-    .from('mercure_commercial_agreement_requests')
+  const { data } = await supabaseAdmin!
+    .schema('mercure')
+    .from('commercial_agreement_requests')
     .select(`
       *,
-      entity:mercure_entities(id, legal_name, tax_id)
+      entity:entities(id, legal_name, tax_id)
     `)
     .order('created_at', { ascending: false });
   return (data || []) as AgreementRequest[];

@@ -109,8 +109,27 @@ text-xs px-1.5 py-0.5 rounded font-medium
 7. Fondo blanco, no gris
 
 ## Base de Datos
-- Las tablas físicas están en el schema `mercure`
-- Existen VIEWS en `public` para uso con la API de Supabase
-- Al usar el cliente: `supabase.from('mercure_shipments')`
-- NO usar `.schema('mercure')`
-- Tablas: mercure_entities, mercure_events, mercure_insurance_rates, mercure_profiles, mercure_quotations, mercure_shipments, mercure_tariffs, mercure_trips, mercure_vehicles
+- TODAS las tablas de Mercure están en el schema `mercure`
+- NO usar schema `public` para tablas de Mercure
+- Al usar el cliente: `supabase.schema('mercure').from('shipments')`
+- SIEMPRE usar `.schema('mercure')` antes de `.from()`
+- Nombres de tablas SIN prefijo `mercure_`:
+  - entities, shipments, trips, vehicles, vehicle_events
+  - events, tariffs, insurance_rates, quotations
+  - client_commercial_terms, commercial_agreement_requests
+  - client_settlements, settlement_items
+  - invoices, afip_config, email_config
+  - user_roles, user_permissions, audit_logs, profiles
+
+### Ejemplo de uso correcto:
+```typescript
+// ✅ Correcto
+const { data } = await supabase
+  .schema('mercure')
+  .from('shipments')
+  .select('*, sender:entities!sender_id(legal_name)')
+
+// ❌ Incorrecto (NO usar)
+const { data } = await supabase
+  .from('mercure_shipments')
+```

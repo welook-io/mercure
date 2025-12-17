@@ -1,6 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { MapPin } from "lucide-react";
 import { DeliveryList } from "./delivery-list";
 
@@ -22,12 +22,12 @@ interface Shipment {
 
 async function getShipmentsReparto() {
   const { data } = await supabase
-    .from('mercure_shipments')
+    .schema('mercure').from('shipments')
     .select(`
       id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,
       declared_value, paid_by, payment_terms, created_at, recipient_address,
-      sender:mercure_entities!sender_id(legal_name), 
-      recipient:mercure_entities!recipient_id(legal_name)
+      sender:entities!sender_id(legal_name), 
+      recipient:entities!recipient_id(legal_name)
     `)
     .eq('status', 'en_reparto')
     .order('created_at', { ascending: false });
@@ -36,12 +36,12 @@ async function getShipmentsReparto() {
 
 async function getShipmentsEntregados() {
   const { data } = await supabase
-    .from('mercure_shipments')
+    .schema('mercure').from('shipments')
     .select(`
       id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,
       declared_value, paid_by, payment_terms, created_at, recipient_address,
-      sender:mercure_entities!sender_id(legal_name), 
-      recipient:mercure_entities!recipient_id(legal_name)
+      sender:entities!sender_id(legal_name), 
+      recipient:entities!recipient_id(legal_name)
     `)
     .in('status', ['entregada', 'delivered', 'no_entregada', 'rechazada'])
     .order('created_at', { ascending: false })

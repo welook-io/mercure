@@ -1,7 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { hasAccess } from "@/lib/auth";
 import { SHIPMENT_STATUS_LABELS, TRIP_STATUS_LABELS } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +9,9 @@ import Link from "next/link";
 
 async function getActiveTrips() {
   const { data } = await supabase
-    .from('mercure_trips')
-    .select(`*, vehicle:mercure_vehicles(identifier)`)
+    .schema('mercure')
+    .from('trips')
+    .select(`*, vehicle:vehicles(identifier)`)
     .in('status', ['planned', 'loading', 'in_transit'])
     .order('departure_time', { ascending: true })
     .limit(10);
@@ -19,8 +20,9 @@ async function getActiveTrips() {
 
 async function getPendingShipments() {
   const { data } = await supabase
-    .from('mercure_shipments')
-    .select(`*, sender:mercure_entities!sender_id(legal_name), recipient:mercure_entities!recipient_id(legal_name)`)
+    .schema('mercure')
+    .from('shipments')
+    .select(`*, sender:entities!sender_id(legal_name), recipient:entities!recipient_id(legal_name)`)
     .in('status', ['received', 'in_warehouse'])
     .order('created_at', { ascending: false })
     .limit(15);
@@ -29,8 +31,9 @@ async function getPendingShipments() {
 
 async function getRecentDeliveries() {
   const { data } = await supabase
-    .from('mercure_shipments')
-    .select(`*, recipient:mercure_entities!recipient_id(legal_name)`)
+    .schema('mercure')
+    .from('shipments')
+    .select(`*, recipient:entities!recipient_id(legal_name)`)
     .eq('status', 'delivered')
     .order('updated_at', { ascending: false })
     .limit(10);

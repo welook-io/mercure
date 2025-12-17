@@ -11,7 +11,7 @@ async function getShipmentData() {
   
   // Obtener el envío de HIPERPLACA para debug
   const { data: shipment, error: shipmentError } = await supabaseAdmin
-    .from('mercure_shipments')
+    .schema('mercure').from('shipments')
     .select('*')
     .eq('id', 10)
     .single();
@@ -27,7 +27,7 @@ async function getShipmentData() {
 
   if (shipment?.sender_id) {
     const { data } = await supabaseAdmin
-      .from('mercure_entities')
+      .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.sender_id)
       .single();
@@ -36,7 +36,7 @@ async function getShipmentData() {
 
   if (shipment?.recipient_id) {
     const { data } = await supabaseAdmin
-      .from('mercure_entities')
+      .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.recipient_id)
       .single();
@@ -46,7 +46,7 @@ async function getShipmentData() {
   // Cargar cotización asociada
   if (shipment?.quotation_id) {
     const { data, error: quotationError } = await supabaseAdmin
-      .from('mercure_quotations')
+      .schema('mercure').from('quotations')
       .select('base_price, insurance_cost, total_price, includes_iva')
       .eq('id', shipment.quotation_id)
       .single();

@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { requireAuth } from "@/lib/auth";
 import Link from "next/link";
@@ -8,7 +8,8 @@ import { TariffTable } from "./tariff-table";
 
 async function getTariffs() {
   const { data } = await supabase
-    .from('mercure_tariffs')
+    .schema('mercure')
+    .from('tariffs')
     .select('*')
     .order('origin', { ascending: true });
   return data || [];
@@ -16,7 +17,8 @@ async function getTariffs() {
 
 async function getInsuranceRates() {
   const { data } = await supabase
-    .from('mercure_insurance_rates')
+    .schema('mercure')
+    .from('insurance_rates')
     .select('*')
     .order('valid_from', { ascending: false })
     .limit(5);
@@ -25,7 +27,8 @@ async function getInsuranceRates() {
 
 async function getQuotations() {
   const { data } = await supabase
-    .from('mercure_quotations')
+    .schema('mercure')
+    .from('quotations')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(20);

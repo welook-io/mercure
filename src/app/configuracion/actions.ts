@@ -330,7 +330,7 @@ export async function assignRole(formData: FormData) {
         });
     }
 
-    // 2. Guardar el rol específico de Mercure en mercure_user_roles
+    // 2. Guardar el rol específico de Mercure en user_roles
     const { data: existingRole } = await supabaseAdmin
       .from("mercure_user_roles")
       .select("id")
@@ -404,7 +404,7 @@ export async function removeRole(formData: FormData) {
       .eq("user_id", targetUserId)
       .eq("organization_id", MERCURE_ORG_ID);
 
-    // 2. Desactivar el rol en mercure_user_roles
+    // 2. Desactivar el rol en user_roles
     const { error } = await supabaseAdmin
       .from("mercure_user_roles")
       .update({ is_active: false })

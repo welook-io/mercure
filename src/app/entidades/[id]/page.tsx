@@ -15,7 +15,7 @@ async function getEntity(id: number) {
   if (!supabaseAdmin) return null;
   
   const { data } = await supabaseAdmin
-    .from('mercure_entities')
+    .schema('mercure').from('entities')
     .select('*')
     .eq('id', id)
     .single();
@@ -26,7 +26,7 @@ async function getCommercialTerms(entityId: number): Promise<CommercialTerms | n
   if (!supabaseAdmin) return null;
   
   const { data } = await supabaseAdmin
-    .from('mercure_client_commercial_terms')
+    .schema('mercure').from('client_commercial_terms')
     .select('id, tariff_modifier, insurance_rate, credit_days')
     .eq('entity_id', entityId)
     .single();

@@ -1,11 +1,11 @@
 import { Navbar } from "@/components/layout/navbar";
 import { requireAuth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { NuevoRemitoForm } from "./nuevo-remito-form";
 
 async function getEntities() {
   const { data } = await supabase
-    .from('mercure_entities')
+    .schema('mercure').from('entities')
     .select('id, legal_name, tax_id, payment_terms')
     .order('legal_name');
   return data || [];

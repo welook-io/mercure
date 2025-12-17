@@ -1,6 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { DownloadButton } from "./download-button";
@@ -27,7 +27,8 @@ export default async function FacturasPage() {
 
   // Obtener facturas
   const { data: facturas, error } = await supabase
-    .from('mercure_invoices')
+    .schema('mercure')
+    .from('invoices')
     .select('*')
     .order('issue_date', { ascending: false });
 

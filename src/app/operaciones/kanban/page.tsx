@@ -1,5 +1,5 @@
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { requireAuth } from "@/lib/auth";
 import { KanbanBoard } from "./kanban-board";
 
@@ -45,14 +45,14 @@ async function getShipments(): Promise<ShipmentWithRelations[]> {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   const { data } = await supabase
-    .from('mercure_shipments')
+    .schema('mercure').from('shipments')
     .select(`
       id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,
       declared_value, recipient_address, created_at, updated_at, trip_id, quotation_id,
-      sender:mercure_entities!sender_id(legal_name),
-      recipient:mercure_entities!recipient_id(legal_name),
-      trip:mercure_trips!trip_id(id, origin, destination, status, departure_time),
-      quotation:mercure_quotations!quotation_id(total_price, base_price, insurance_cost)
+      sender:entities!sender_id(legal_name),
+      recipient:entities!recipient_id(legal_name),
+      trip:trips!trip_id(id, origin, destination, status, departure_time),
+      quotation:quotations!quotation_id(total_price, base_price, insurance_cost)
     `)
     .neq('status', 'cancelled')
     .gte('created_at', thirtyDaysAgo.toISOString())

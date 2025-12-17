@@ -1,6 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { ClientList } from "./client-list";
 import Link from "next/link";
 
@@ -20,7 +20,7 @@ interface ClientWithBalance {
 async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
   // Obtener clientes con cuenta corriente (incluir saldo inicial)
   const { data: entities } = await supabase
-    .from('mercure_entities')
+    .schema('mercure').from('entities')
     .select('id, legal_name, tax_id, address, phone, email, payment_terms, initial_balance')
     .eq('payment_terms', 'cuenta_corriente')
     .order('legal_name');
@@ -31,13 +31,13 @@ async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
 
   // Obtener envíos rendidos por cliente (pendientes de facturar)
   const { data: shipments } = await supabase
-    .from('mercure_shipments')
+    .schema('mercure').from('shipments')
     .select('id, sender_id, declared_value')
     .eq('status', 'rendida');
 
   // Obtener última liquidación por cliente
   const { data: settlements } = await supabase
-    .from('mercure_client_settlements')
+    .schema('mercure').from('client_settlements')
     .select('entity_id, settlement_number, settlement_date')
     .order('settlement_date', { ascending: false });
 

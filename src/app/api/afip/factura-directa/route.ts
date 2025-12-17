@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createInvoice, getLastVoucherNumber, checkServiceStatus } from '@/lib/afip/wsfe';
 import { CONCEPT_CODES, DOC_TYPE_CODES, InvoiceType } from '@/lib/afip/types';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from "@/lib/supabase";
 
 interface FacturaDirectaRequest {
   cliente_id: number;
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     // Guardar la factura en la tabla de facturas
     await supabase
-      .from('mercure_invoices')
+      .schema('mercure').from('invoices')
       .insert({
         invoice_number: invoiceNumber,
         invoice_type: body.invoice_type,

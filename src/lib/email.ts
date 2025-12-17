@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { supabase } from './supabase';
+import { supabaseAdmin } from './supabase';
 
 interface EmailConfig {
   api_key: string;
@@ -15,8 +15,9 @@ let resendClient: Resend | null = null;
 async function getEmailConfig(): Promise<EmailConfig | null> {
   if (cachedConfig) return cachedConfig;
 
-  const { data, error } = await supabase
-    .from('mercure_email_config')
+  const { data, error } = await supabaseAdmin!
+    .schema('mercure')
+    .from('email_config')
     .select('*')
     .eq('is_active', true)
     .single();
@@ -155,8 +156,9 @@ export async function sendInvoiceEmail(params: SendInvoiceEmailParams): Promise<
 
 // Función para obtener email del cliente desde la entidad
 export async function getClientEmail(entityId: number): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('mercure_entities')
+  const { data, error } = await supabaseAdmin!
+    .schema('mercure')
+    .from('entities')
     .select('email')
     .eq('id', entityId)
     .single();

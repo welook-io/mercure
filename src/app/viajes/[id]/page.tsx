@@ -1,13 +1,13 @@
 import { Navbar } from "@/components/layout/navbar";
 import { requireAuth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import { TripDetailClient } from "./trip-detail-client";
 
 async function getTrip(id: number) {
   const { data } = await supabase
-    .from('mercure_trips')
-    .select(`*, vehicle:mercure_vehicles(identifier, tractor_license_plate)`)
+    .schema('mercure').from('trips')
+    .select(`*, vehicle:vehicles(identifier, tractor_license_plate)`)
     .eq('id', id)
     .single();
   return data;
@@ -15,11 +15,11 @@ async function getTrip(id: number) {
 
 async function getTripShipments(tripId: number) {
   const { data } = await supabase
-    .from('mercure_shipments')
+    .schema('mercure').from('shipments')
     .select(`
       *,
-      sender:mercure_entities!shipments_sender_id_fkey(id, legal_name),
-      recipient:mercure_entities!shipments_recipient_id_fkey(id, legal_name)
+      sender:entities!shipments_sender_id_fkey(id, legal_name),
+      recipient:entities!shipments_recipient_id_fkey(id, legal_name)
     `)
     .eq('trip_id', tripId)
     .order('created_at', { ascending: false });
@@ -28,7 +28,7 @@ async function getTripShipments(tripId: number) {
 
 async function getEntities() {
   const { data } = await supabase
-    .from('mercure_entities')
+    .schema('mercure').from('entities')
     .select('id, legal_name, tax_id')
     .order('legal_name');
   return data || [];

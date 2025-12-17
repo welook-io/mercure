@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       const cleanCuit = cuit.replace(/[-\s]/g, ''); // Limpiar guiones y espacios
       
       const { data: byCuit } = await supabaseAdmin
-        .from('mercure_entities')
+        .schema('mercure').from('entities')
         .select('*')
         .or(`tax_id.eq.${cuit.trim()},tax_id.eq.${cleanCuit}`)
         .limit(1)
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       
       // Buscar coincidencia exacta primero (con el nombre limpio)
       const { data: exactMatch } = await supabaseAdmin
-        .from('mercure_entities')
+        .schema('mercure').from('entities')
         .select('*')
         .ilike('legal_name', cleanName)
         .limit(1)
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       } else {
         // Buscar coincidencia parcial
         const { data: partialMatches } = await supabaseAdmin
-          .from('mercure_entities')
+          .schema('mercure').from('entities')
           .select('*')
           .or(`legal_name.ilike.%${searchName}%,legal_name.ilike.${searchName}%`)
           .limit(5);

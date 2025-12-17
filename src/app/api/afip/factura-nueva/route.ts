@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createInvoice } from '@/lib/afip/wsfe';
 import { CONCEPT_CODES, DOC_TYPE_CODES, InvoiceType } from '@/lib/afip/types';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from "@/lib/supabase";
 import { sendInvoiceEmail, getClientEmail } from '@/lib/email';
 import { generateInvoicePdf } from '@/lib/invoice-pdf';
 import { logInvoiceCreated } from '@/lib/audit-log';
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     // Guardar la factura en la base de datos
     const { data: invoiceData, error: invoiceError } = await supabase
-      .from('mercure_invoices')
+      .schema('mercure').from('invoices')
       .insert({
         invoice_number: invoiceNumber,
         invoice_type: body.invoice_type,
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     // Si es modo automático, vincular los remitos con la factura
     if (body.emission_mode === 'automatic' && body.remito_ids && invoiceData) {
       const { error: updateError } = await supabase
-        .from('mercure_shipments')
+        .schema('mercure').from('shipments')
         .update({ invoice_id: invoiceData.id })
         .in('id', body.remito_ids);
 

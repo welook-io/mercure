@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { requireAuth } from "@/lib/auth";
 import Link from "next/link";
@@ -34,7 +34,8 @@ interface VehicleEvent {
 
 async function getVehicles(): Promise<Vehicle[]> {
   const { data } = await supabase
-    .from('mercure_vehicles')
+    .schema('mercure')
+    .from('vehicles')
     .select('*')
     .order('identifier', { ascending: true });
   return (data as Vehicle[]) || [];
@@ -42,7 +43,8 @@ async function getVehicles(): Promise<Vehicle[]> {
 
 async function getVehicleEvents(): Promise<VehicleEvent[]> {
   const { data } = await supabase
-    .from('mercure_vehicle_events')
+    .schema('mercure')
+    .from('vehicle_events')
     .select('id, vehicle_id, event_type, event_date, km_at_event, next_date, next_km')
     .order('event_date', { ascending: false });
   return (data as VehicleEvent[]) || [];

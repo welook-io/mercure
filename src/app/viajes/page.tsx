@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 import { TRIP_STATUS_LABELS } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { requireAuth } from "@/lib/auth";
@@ -9,12 +9,13 @@ import { Truck, Package } from "lucide-react";
 
 async function getTrips() {
   const { data } = await supabase
-    .from('mercure_trips')
+    .schema('mercure')
+    .from('trips')
     .select(`
       *, 
-      vehicle:mercure_vehicles(identifier, tractor_license_plate),
-      client:mercure_entities!trips_client_id_fkey(legal_name),
-      supplier:mercure_entities!trips_supplier_id_fkey(legal_name)
+      vehicle:vehicles(identifier, tractor_license_plate),
+      client:entities!trips_client_id_fkey(legal_name),
+      supplier:entities!trips_supplier_id_fkey(legal_name)
     `)
     .order('created_at', { ascending: false })
     .limit(100);

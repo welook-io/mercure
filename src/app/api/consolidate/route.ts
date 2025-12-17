@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el viaje existe y está en estado válido
     const { data: trip, error: tripError } = await supabaseAdmin
-      .from('mercure_trips')
+      .schema('mercure').from('trips')
       .select('id, status, destination')
       .eq('id', tripId)
       .single();
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Actualizar los envíos: asignar al viaje y cambiar estado
     const { data: updatedShipments, error: updateError } = await supabaseAdmin
-      .from('mercure_shipments')
+      .schema('mercure').from('shipments')
       .update({
         trip_id: tripId,
         status: 'consolidada'
@@ -71,14 +71,14 @@ export async function POST(request: NextRequest) {
     // Actualizar el viaje a estado "loading" si estaba en "planned"
     if (trip.status === 'planned') {
       await supabaseAdmin
-        .from('mercure_trips')
+        .schema('mercure').from('trips')
         .update({ status: 'loading' })
         .eq('id', tripId);
     }
 
     // Registrar evento
     await supabaseAdmin
-      .from('mercure_events')
+      .schema('mercure').from('events')
       .insert(
         shipmentIds.map((id: number) => ({
           event_type: 'shipment_consolidated',

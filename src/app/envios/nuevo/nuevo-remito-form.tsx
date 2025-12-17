@@ -204,7 +204,7 @@ export function NuevoRemitoForm({ entities }: { entities: Entity[] }) {
       const clientId = parseInt(formData.recipient_id);
 
       const { error: insertError } = await supabase
-        .from('mercure_shipments')
+        .schema('mercure').from('shipments')
         .insert({
           delivery_note_number: formData.delivery_note_number,
           sender_id: clientId, // El cliente va en sender_id para CC
