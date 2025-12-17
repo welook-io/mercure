@@ -40,7 +40,7 @@ interface VehicleEvent {
 }
 
 async function getVehicle(id: string): Promise<Vehicle | null> {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('vehicles')
     .select('*')
     .eq('id', id)
@@ -49,7 +49,7 @@ async function getVehicle(id: string): Promise<Vehicle | null> {
 }
 
 async function getVehicleEvents(vehicleId: string): Promise<VehicleEvent[]> {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('vehicle_events')
     .select('*')
     .eq('vehicle_id', vehicleId)

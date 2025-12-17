@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
 async function getActiveTrips() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure')
     .from('trips')
     .select(`*, vehicle:vehicles(identifier)`)
@@ -19,7 +19,7 @@ async function getActiveTrips() {
 }
 
 async function getPendingShipments() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure')
     .from('shipments')
     .select(`*, sender:entities!sender_id(legal_name), recipient:entities!recipient_id(legal_name)`)
@@ -30,7 +30,7 @@ async function getPendingShipments() {
 }
 
 async function getRecentDeliveries() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure')
     .from('shipments')
     .select(`*, recipient:entities!recipient_id(legal_name)`)

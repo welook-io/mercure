@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { EditShipmentForm } from "./edit-shipment-form";
 
 async function getShipmentData(id: number) {
-  const { data: shipment } = await supabase
+  const { data: shipment } = await supabaseAdmin!
     .schema('mercure').from('shipments')
     .select('*, quotation_id, remito_image_url, cargo_image_url')
     .eq('id', id)
@@ -18,7 +18,7 @@ async function getShipmentData(id: number) {
   let recipient = null;
 
   if (shipment.sender_id) {
-    const { data } = await supabase
+    const { data } = await supabaseAdmin!
       .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.sender_id)
@@ -27,7 +27,7 @@ async function getShipmentData(id: number) {
   }
 
   if (shipment.recipient_id) {
-    const { data } = await supabase
+    const { data } = await supabaseAdmin!
       .schema('mercure').from('entities')
       .select('id, legal_name, tax_id, address, phone, email')
       .eq('id', shipment.recipient_id)
@@ -43,7 +43,7 @@ async function getShipmentData(id: number) {
 }
 
 async function getEntities() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('entities')
     .select('id, legal_name, tax_id')
     .order('legal_name');

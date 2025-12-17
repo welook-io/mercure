@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { ArrowLeft, Truck, Save } from "lucide-react";
 import Link from "next/link";
 
@@ -71,7 +71,7 @@ export default function NuevoVehiculoPage() {
       if (insertError) throw insertError;
 
       if (data) {
-        await supabaseAdmin.schema('mercure').from('vehicle_events').insert({
+        await supabase.schema('mercure').from('vehicle_events').insert({
           vehicle_id: data.id,
           event_type: 'compra',
           event_date: formData.purchase_date || new Date().toISOString().split('T')[0],

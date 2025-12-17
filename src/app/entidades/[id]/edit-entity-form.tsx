@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateEntity, upsertCommercialTerms, deleteCommercialTerms } from "./actions";
 import { Loader2, Save, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 interface Entity {
   id: number;

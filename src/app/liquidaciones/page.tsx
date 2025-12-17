@@ -16,7 +16,7 @@ const SETTLEMENT_STATUS_LABELS: Record<string, string> = {
 };
 
 async function getSettlements() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('client_settlements')
     .select(`*, entity:entities(id, legal_name, tax_id)`)
     .order('settlement_date', { ascending: false })
@@ -25,7 +25,7 @@ async function getSettlements() {
 }
 
 async function getStats() {
-  const { data: settlements } = await supabase
+  const { data: settlements } = await supabaseAdmin!
     .schema('mercure').from('client_settlements')
     .select('status, total_amount');
   

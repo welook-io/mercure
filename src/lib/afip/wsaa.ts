@@ -18,7 +18,7 @@ async function getAfipConfig(): Promise<{ cert: string; key: string; cuit: strin
     return cachedAfipConfig;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin!
     .schema('mercure')
     .from('afip_config')
     .select('certificate, private_key, cuit, environment')

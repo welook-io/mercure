@@ -21,7 +21,7 @@ interface Shipment {
 }
 
 async function getShipmentsReparto() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('shipments')
     .select(`
       id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,
@@ -35,7 +35,7 @@ async function getShipmentsReparto() {
 }
 
 async function getShipmentsEntregados() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('shipments')
     .select(`
       id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,

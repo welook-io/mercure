@@ -44,7 +44,7 @@ async function getShipments(): Promise<ShipmentWithRelations[]> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('shipments')
     .select(`
       id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,

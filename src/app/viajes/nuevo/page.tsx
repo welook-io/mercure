@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Loader2, Save, ArrowLeft, Truck, Package, MapPin, Building2, Calendar, DollarSign, Weight, Box } from "lucide-react";
 import Link from "next/link";
 
@@ -69,8 +69,8 @@ export default function NuevoViajePage() {
   useEffect(() => {
     async function loadData() {
       const [entitiesRes, vehiclesRes] = await Promise.all([
-        supabaseAdmin.schema('mercure').from('entities').select('id, legal_name, tax_id').order('legal_name'),
-        supabaseAdmin.schema('mercure').from('vehicles').select('id, identifier, tractor_license_plate').order('identifier'),
+        supabase.schema('mercure').from('entities').select('id, legal_name, tax_id').order('legal_name'),
+        supabase.schema('mercure').from('vehicles').select('id, identifier, tractor_license_plate').order('identifier'),
       ]);
       setEntities(entitiesRes.data || []);
       setVehicles(vehiclesRes.data || []);

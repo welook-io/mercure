@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       : null;
 
     // Guardar la factura en la tabla de facturas
-    await supabase
+    await supabaseAdmin!
       .schema('mercure').from('invoices')
       .insert({
         invoice_number: invoiceNumber,

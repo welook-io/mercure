@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'settlement_id es requerido' }, { status: 400 });
     }
 
-    const { data: settlement, error: settlementError } = await supabase
+    const { data: settlement, error: settlementError } = await supabaseAdmin!
       .schema('mercure').from('client_settlements')
       .select(`*, entity:entities(id, legal_name, tax_id, address)`)
       .eq('id', settlement_id)
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const caeExp = result.caeExpiration;
     const caeExpirationFormatted = caeExp ? `${caeExp.slice(0, 4)}-${caeExp.slice(4, 6)}-${caeExp.slice(6, 8)}` : null;
 
-    await supabase
+    await supabaseAdmin!
       .schema('mercure').from('client_settlements')
       .update({
         status: 'facturada',
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       .eq('id', settlement_id);
 
     // Guardar la factura en la tabla de facturas
-    await supabase
+    await supabaseAdmin!
       .schema('mercure').from('invoices')
       .insert({
         invoice_number: invoiceNumber,

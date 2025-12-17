@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { TripDetailClient } from "./trip-detail-client";
 
 async function getTrip(id: number) {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('trips')
     .select(`*, vehicle:vehicles(identifier, tractor_license_plate)`)
     .eq('id', id)
@@ -14,7 +14,7 @@ async function getTrip(id: number) {
 }
 
 async function getTripShipments(tripId: number) {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('shipments')
     .select(`
       *,
@@ -27,7 +27,7 @@ async function getTripShipments(tripId: number) {
 }
 
 async function getEntities() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('entities')
     .select('id, legal_name, tax_id')
     .order('legal_name');

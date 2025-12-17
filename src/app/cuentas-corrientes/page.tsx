@@ -19,7 +19,7 @@ interface ClientWithBalance {
 
 async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
   // Obtener clientes con cuenta corriente (incluir saldo inicial)
-  const { data: entities } = await supabase
+  const { data: entities } = await supabaseAdmin!
     .schema('mercure').from('entities')
     .select('id, legal_name, tax_id, address, phone, email, payment_terms, initial_balance')
     .eq('payment_terms', 'cuenta_corriente')
@@ -30,13 +30,13 @@ async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
   }
 
   // Obtener envíos rendidos por cliente (pendientes de facturar)
-  const { data: shipments } = await supabase
+  const { data: shipments } = await supabaseAdmin!
     .schema('mercure').from('shipments')
     .select('id, sender_id, declared_value')
     .eq('status', 'rendida');
 
   // Obtener última liquidación por cliente
-  const { data: settlements } = await supabase
+  const { data: settlements } = await supabaseAdmin!
     .schema('mercure').from('client_settlements')
     .select('entity_id, settlement_number, settlement_date')
     .order('settlement_date', { ascending: false });

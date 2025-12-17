@@ -7,7 +7,7 @@ import Link from "next/link";
 import { TariffTable } from "./tariff-table";
 
 async function getTariffs() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure')
     .from('tariffs')
     .select('*')
@@ -16,7 +16,7 @@ async function getTariffs() {
 }
 
 async function getInsuranceRates() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure')
     .from('insurance_rates')
     .select('*')
@@ -26,7 +26,7 @@ async function getInsuranceRates() {
 }
 
 async function getQuotations() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure')
     .from('quotations')
     .select('*')

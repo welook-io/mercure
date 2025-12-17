@@ -26,7 +26,7 @@ export default async function FacturasPage() {
   await requireAuth("/facturas");
 
   // Obtener facturas
-  const { data: facturas, error } = await supabase
+  const { data: facturas, error } = await supabaseAdmin!
     .schema('mercure')
     .from('invoices')
     .select('*')

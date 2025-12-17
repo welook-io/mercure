@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Package, Truck, Check, Loader2, ChevronDown, MapPin } from "lucide-react";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { timeAgo } from "@/lib/utils";
 
 interface Shipment {

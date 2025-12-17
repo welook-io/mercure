@@ -31,7 +31,7 @@ function getLegalName(entity: { legal_name: string } | { legal_name: string }[] 
 const ARRIBO_STATUSES = ['en_descarga', 'disponible'];
 
 async function getShipmentsArribo() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure').from('shipments')
     .select(`
       id, delivery_note_number, status, package_quantity, weight_kg, volume_m3,

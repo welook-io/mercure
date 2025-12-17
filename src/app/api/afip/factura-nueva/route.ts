@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       : null;
 
     // Guardar la factura en la base de datos
-    const { data: invoiceData, error: invoiceError } = await supabase
+    const { data: invoiceData, error: invoiceError } = await supabaseAdmin!
       .schema('mercure').from('invoices')
       .insert({
         invoice_number: invoiceNumber,
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
 
     // Si es modo automático, vincular los remitos con la factura
     if (body.emission_mode === 'automatic' && body.remito_ids && invoiceData) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin!
         .schema('mercure').from('shipments')
         .update({ invoice_id: invoiceData.id })
         .in('id', body.remito_ids);

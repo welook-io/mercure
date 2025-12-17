@@ -5,7 +5,7 @@ import { FacturaTestClient } from "./factura-test-client";
 
 async function getHiperplacaData() {
   // Obtener datos de HIPERPLACA
-  const { data: entity, error } = await supabase
+  const { data: entity, error } = await supabaseAdmin!
     .schema('mercure').from('entities')
     .select('*')
     .ilike('legal_name', '%HIPERPLACA%')

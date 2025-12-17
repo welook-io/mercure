@@ -8,7 +8,7 @@ import Link from "next/link";
 import { Truck, Package } from "lucide-react";
 
 async function getTrips() {
-  const { data } = await supabase
+  const { data } = await supabaseAdmin!
     .schema('mercure')
     .from('trips')
     .select(`
