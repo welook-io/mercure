@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import QRCode from 'qrcode';
 
 interface InvoicePdfParams {
   invoiceNumber: string;
@@ -62,8 +63,15 @@ export async function generateInvoicePdf(params: InvoicePdfParams): Promise<Buff
     codAut: parseInt(params.cae),
   };
 
-  const qrBase64 = Buffer.from(JSON.stringify(qrData)).toString('base64');
-  const qrUrl = `https://www.afip.gob.ar/fe/qr/?p=${qrBase64}`;
+  const qrBase64Data = Buffer.from(JSON.stringify(qrData)).toString('base64');
+  const qrUrl = `https://www.afip.gob.ar/fe/qr/?p=${qrBase64Data}`;
+  
+  // Generar QR como imagen base64 localmente
+  const qrImageBase64 = await QRCode.toDataURL(qrUrl, {
+    width: 120,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+  });
 
   const html = `
 <!DOCTYPE html>
@@ -228,11 +236,14 @@ export async function generateInvoicePdf(params: InvoicePdfParams): Promise<Buff
     .qr-box {
       width: 120px;
       height: 120px;
-      border: 1px solid #ccc;
       display: flex;
       align-items: center;
       justify-content: center;
       background: white;
+    }
+    .qr-box img {
+      width: 120px;
+      height: 120px;
     }
     .footer {
       margin-top: 20px;
@@ -326,7 +337,7 @@ export async function generateInvoicePdf(params: InvoicePdfParams): Promise<Buff
       <div class="cae-vto">Fecha de Vencimiento: ${formatDate(params.caeExpiration)}</div>
     </div>
     <div class="qr-box">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrUrl)}" width="100" height="100" alt="QR AFIP" />
+      <img src="${qrImageBase64}" alt="QR AFIP" />
     </div>
   </div>
 
@@ -342,10 +353,7 @@ export async function generateInvoicePdf(params: InvoicePdfParams): Promise<Buff
     args: ['--no-sandbox', '--disable-setuid-sandbox'] 
   });
   const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 10000 });
-  
-  // Esperar un poco para que cargue el QR
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await page.setContent(html, { waitUntil: 'load', timeout: 10000 });
   
   const pdfBuffer = await page.pdf({ 
     format: 'A4', 
