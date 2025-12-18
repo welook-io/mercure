@@ -102,6 +102,29 @@ export default async function Home() {
             </div>
           </div>
 
+          {/* Empty state - cuando todo está vacío */}
+          {activeTrips.length === 0 && pendingShipments.length === 0 && recentDeliveries.length === 0 && (
+            <div className="mb-4 p-4 bg-neutral-50 border border-neutral-200 rounded">
+              <p className="text-sm text-neutral-700 font-medium mb-2">
+                ¡Bienvenido a Mercure! 👋
+              </p>
+              <p className="text-xs text-neutral-500 mb-3">
+                Aún no hay actividad. Empezá registrando recepciones o creando viajes.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/recepcion/nueva" className="px-3 py-1.5 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors">
+                  Nueva Recepción
+                </Link>
+                <Link href="/viajes/nuevo" className="px-3 py-1.5 text-xs bg-neutral-900 text-white rounded hover:bg-neutral-800 transition-colors">
+                  Nuevo Viaje
+                </Link>
+                <Link href="/entidades" className="px-3 py-1.5 text-xs border border-neutral-200 text-neutral-600 rounded hover:bg-neutral-100 transition-colors">
+                  Ver Entidades
+                </Link>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Viajes Activos */}
             <div>

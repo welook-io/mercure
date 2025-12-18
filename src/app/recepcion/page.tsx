@@ -80,14 +80,6 @@ export default async function RecepcionPage() {
             </Link>
           </div>
 
-          {/* Proceso compacto - hidden on mobile */}
-          <div className="hidden md:flex items-center gap-6 mb-4 text-xs text-neutral-500">
-            <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs">1</span> Control físico</span>
-            <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs">2</span> Comparar remito</span>
-            <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs">3</span> Sellar</span>
-            <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-neutral-900 text-white flex items-center justify-center text-xs">4</span> Registrar</span>
-          </div>
-
           <ShipmentList shipments={shipments} />
         </div>
       </main>

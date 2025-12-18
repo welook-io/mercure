@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateEntity, upsertCommercialTerms, deleteCommercialTerms } from "./actions";
 import { Loader2, Save, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 
 interface Entity {
   id: number;
@@ -75,58 +73,41 @@ export function EditEntityForm({ entity, commercialTerms }: { entity: Entity; co
     setError(null);
 
     try {
-      // Actualizar entidad solo con campos que existen
-      const { error: updateError } = await supabase
-        .schema('mercure').from('entities')
-        .update({
-          legal_name: formData.legal_name,
-          tax_id: formData.tax_id || null,
-          entity_type: formData.entity_type || null,
-          payment_terms: formData.payment_terms || null,
-          email: formData.email || null,
-          phone: formData.phone || null,
-          address: formData.address || null,
-          notes: formData.notes || null,
-        })
-        .eq('id', entity.id);
+      // Preparar datos para enviar
+      const requestBody: any = {
+        id: entity.id,
+        legal_name: formData.legal_name,
+        tax_id: formData.tax_id || null,
+        entity_type: formData.entity_type || null,
+        payment_terms: formData.payment_terms || null,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        notes: formData.notes || null,
+      };
 
-      if (updateError) {
-        throw new Error(updateError.message);
-      }
-
-      // Guardar o actualizar términos comerciales si están habilitados
+      // Términos comerciales
       if (hasCommercialTerms) {
-        const termsData = {
-          entity_id: entity.id,
+        requestBody.commercial_terms = {
           tariff_modifier: parseFloat(formData.tariff_modifier) || 0,
           insurance_rate: (parseFloat(formData.insurance_rate) || 0.8) / 100, // Convertir de % a decimal
           credit_days: parseInt(formData.credit_days) || 0,
         };
-
-        if (commercialTerms) {
-          // Actualizar existente
-          const { error: termsError } = await supabase
-            .schema('mercure').from('client_commercial_terms')
-            .update(termsData)
-            .eq('id', commercialTerms.id);
-          
-          if (termsError) throw new Error(termsError.message);
-        } else {
-          // Crear nuevo
-          const { error: termsError } = await supabase
-            .schema('mercure').from('client_commercial_terms')
-            .insert(termsData);
-          
-          if (termsError) throw new Error(termsError.message);
-        }
       } else if (commercialTerms) {
-        // Si se deshabilitó, eliminar los términos
-        const { error: deleteError } = await supabase
-          .schema('mercure').from('client_commercial_terms')
-          .delete()
-          .eq('id', commercialTerms.id);
-        
-        if (deleteError) throw new Error(deleteError.message);
+        // Si se deshabilitó, marcar para eliminar
+        requestBody.commercial_terms = null;
+      }
+
+      const response = await fetch('/api/entidades', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al guardar');
       }
 
       router.push('/entidades');

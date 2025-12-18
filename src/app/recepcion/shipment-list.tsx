@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { SHIPMENT_STATUS_LABELS } from "@/lib/types";
 import { timeAgo } from "@/lib/utils";
-import { ChevronDown, Package, FileText, Pencil, Image as ImageIcon, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Package, FileText, Pencil, Image as ImageIcon, X, Search, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
+import { Input } from "@/components/ui/input";
 
 type Shipment = {
   id: number;
@@ -23,6 +24,9 @@ type Shipment = {
   cargo_image_url: string | null;
 };
 
+type SortField = 'created_at' | 'recipient' | 'sender' | 'package_quantity' | 'declared_value';
+type SortDirection = 'asc' | 'desc';
+
 function getStatusVariant(status: string): "default" | "success" | "warning" | "error" | "info" {
   switch (status) {
     case 'received': return 'info';
@@ -35,12 +39,82 @@ function getStatusVariant(status: string): "default" | "success" | "warning" | "
 export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [imageModal, setImageModal] = useState<{ url: string; title: string } | null>(null);
+  
+  // Filtros y ordenamiento
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Calcular total del flete
-  const totalFlete = shipments.reduce((sum, s) => {
+  // Aplicar filtros y ordenamiento
+  const filteredAndSortedShipments = useMemo(() => {
+    let result = [...shipments];
+    
+    // Filtro por texto (remito, remitente, destinatario)
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(s => 
+        (s.delivery_note_number?.toLowerCase().includes(term)) ||
+        (s.sender?.legal_name?.toLowerCase().includes(term)) ||
+        (s.recipient?.legal_name?.toLowerCase().includes(term))
+      );
+    }
+    
+    // Filtro por estado
+    if (statusFilter !== 'all') {
+      result = result.filter(s => s.status === statusFilter);
+    }
+    
+    // Ordenamiento
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'created_at':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case 'recipient':
+          comparison = (a.recipient?.legal_name || '').localeCompare(b.recipient?.legal_name || '');
+          break;
+        case 'sender':
+          comparison = (a.sender?.legal_name || '').localeCompare(b.sender?.legal_name || '');
+          break;
+        case 'package_quantity':
+          comparison = (a.package_quantity || 0) - (b.package_quantity || 0);
+          break;
+        case 'declared_value':
+          comparison = (a.declared_value || 0) - (b.declared_value || 0);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    
+    return result;
+  }, [shipments, searchTerm, statusFilter, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 text-neutral-300" />;
+    return sortDirection === 'asc' 
+      ? <ChevronUp className="w-3 h-3 text-orange-500" />
+      : <ChevronDown className="w-3 h-3 text-orange-500" />;
+  };
+
+  // Calcular total del flete (de los filtrados)
+  const totalFlete = filteredAndSortedShipments.reduce((sum, s) => {
     const price = s.quotation?.total_price || 0;
     return sum + Number(price);
   }, 0);
+
+  // Obtener estados únicos para el filtro
+  const uniqueStatuses = [...new Set(shipments.map(s => s.status))];
 
   if (shipments.length === 0) {
     return (
@@ -52,9 +126,68 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
 
   return (
     <>
+      {/* Barra de filtros */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+        {/* Búsqueda */}
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
+          <Input
+            placeholder="Buscar remito, remitente o destinatario..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="h-8 pl-8 text-sm"
+          />
+        </div>
+        
+        {/* Filtro de estado */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-8 px-2 text-sm border border-neutral-200 rounded bg-white focus:border-neutral-400 focus:outline-none"
+        >
+          <option value="all">Todos los estados</option>
+          {uniqueStatuses.map(status => (
+            <option key={status} value={status}>
+              {SHIPMENT_STATUS_LABELS[status as keyof typeof SHIPMENT_STATUS_LABELS] || status}
+            </option>
+          ))}
+        </select>
+        
+        {/* Ordenar (solo mobile) */}
+        <select
+          value={`${sortField}-${sortDirection}`}
+          onChange={(e) => {
+            const [field, dir] = e.target.value.split('-') as [SortField, SortDirection];
+            setSortField(field);
+            setSortDirection(dir);
+          }}
+          className="h-8 px-2 text-sm border border-neutral-200 rounded bg-white focus:border-neutral-400 focus:outline-none md:hidden"
+        >
+          <option value="created_at-desc">Más recientes</option>
+          <option value="created_at-asc">Más antiguos</option>
+          <option value="recipient-asc">Destinatario A-Z</option>
+          <option value="recipient-desc">Destinatario Z-A</option>
+          <option value="package_quantity-desc">Más bultos</option>
+          <option value="declared_value-desc">Mayor valor</option>
+        </select>
+      </div>
+      
+      {/* Contador de resultados */}
+      {(searchTerm || statusFilter !== 'all') && (
+        <p className="text-xs text-neutral-500 mb-2">
+          Mostrando {filteredAndSortedShipments.length} de {shipments.length} envíos
+        </p>
+      )}
+      
+      {filteredAndSortedShipments.length === 0 ? (
+        <div className="px-3 py-8 text-center text-neutral-400 border border-neutral-200 rounded">
+          No se encontraron envíos con esos filtros
+        </div>
+      ) : (
+        <>
       {/* Mobile View - Cards compactas */}
       <div className="md:hidden space-y-2">
-        {shipments.map((s) => (
+        {filteredAndSortedShipments.map((s) => (
           <div 
             key={s.id} 
             className="border border-neutral-200 rounded bg-white"
@@ -186,20 +319,55 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
               <tr className="bg-neutral-50 border-b border-neutral-200">
                 <th className="px-2 py-2 text-center text-xs font-medium text-neutral-500 uppercase w-16">Fotos</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remito</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remitente</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Destinatario</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Bultos</th>
+                <th 
+                  className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase cursor-pointer hover:bg-neutral-100"
+                  onClick={() => handleSort('sender')}
+                >
+                  <span className="flex items-center gap-1">
+                    Remitente <SortIcon field="sender" />
+                  </span>
+                </th>
+                <th 
+                  className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase cursor-pointer hover:bg-neutral-100"
+                  onClick={() => handleSort('recipient')}
+                >
+                  <span className="flex items-center gap-1">
+                    Destinatario <SortIcon field="recipient" />
+                  </span>
+                </th>
+                <th 
+                  className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase cursor-pointer hover:bg-neutral-100"
+                  onClick={() => handleSort('package_quantity')}
+                >
+                  <span className="flex items-center justify-end gap-1">
+                    Bultos <SortIcon field="package_quantity" />
+                  </span>
+                </th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Kg</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">m³</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Valor</th>
+                <th 
+                  className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase cursor-pointer hover:bg-neutral-100"
+                  onClick={() => handleSort('declared_value')}
+                >
+                  <span className="flex items-center justify-end gap-1">
+                    Valor <SortIcon field="declared_value" />
+                  </span>
+                </th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Flete</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Estado</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Ingreso</th>
+                <th 
+                  className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase cursor-pointer hover:bg-neutral-100"
+                  onClick={() => handleSort('created_at')}
+                >
+                  <span className="flex items-center gap-1">
+                    Ingreso <SortIcon field="created_at" />
+                  </span>
+                </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-neutral-500 uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {shipments.map((s) => (
+              {filteredAndSortedShipments.map((s) => (
                 <tr key={s.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
                   <td className="px-2 py-1">
                     <div className="flex items-center justify-center gap-1">
@@ -284,6 +452,8 @@ export function ShipmentList({ shipments }: { shipments: Shipment[] }) {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* Modal de imagen */}
       {imageModal && (

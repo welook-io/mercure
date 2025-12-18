@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { ArrowLeft, Save, Loader2, Calculator, Trash2, Upload, Image as ImageIcon, X } from "lucide-react";
 import Link from "next/link";
 
@@ -68,17 +67,18 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
   useEffect(() => {
     async function loadQuotation() {
       if (shipment.quotation_id) {
-        const { data } = await supabase
-          .schema('mercure').from('quotations')
-          .select('total_price, base_price, insurance_cost')
-          .eq('id', shipment.quotation_id)
-          .single();
-        if (data) {
-          setQuotation({
-            total_price: Number(data.total_price),
-            base_price: Number(data.base_price),
-            insurance_cost: Number(data.insurance_cost),
-          });
+        try {
+          const response = await fetch(`/api/shipments?quotationId=${shipment.quotation_id}`);
+          const result = await response.json();
+          if (result.quotation) {
+            setQuotation({
+              total_price: Number(result.quotation.total_price),
+              base_price: Number(result.quotation.base_price),
+              insurance_cost: Number(result.quotation.insurance_cost),
+            });
+          }
+        } catch (error) {
+          console.error('Error loading quotation:', error);
         }
       }
     }
@@ -157,42 +157,33 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
     setMessage(null);
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${shipment.id}_${type}_${Date.now()}.${fileExt}`;
-      const filePath = `shipments/${fileName}`;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('shipmentId', shipment.id.toString());
+      formData.append('type', type);
 
-      // Subir a Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('mercure-images')
-        .upload(filePath, file, { upsert: true });
+      const response = await fetch('/api/shipments', {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (uploadError) throw uploadError;
+      const result = await response.json();
 
-      // Obtener URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('mercure-images')
-        .getPublicUrl(filePath);
-
-      // Actualizar en la base de datos
-      const updateField = type === 'remito' ? 'remito_image_url' : 'cargo_image_url';
-      const { error: updateError } = await supabase
-        .schema('mercure').from('shipments')
-        .update({ [updateField]: publicUrl })
-        .eq('id', shipment.id);
-
-      if (updateError) throw updateError;
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al subir la imagen');
+      }
 
       // Actualizar estado local
       if (type === 'remito') {
-        setRemitoImageUrl(publicUrl);
+        setRemitoImageUrl(result.url);
       } else {
-        setCargoImageUrl(publicUrl);
+        setCargoImageUrl(result.url);
       }
 
-      setMessage({ type: 'success', text: `Foto de ${type === 'remito' ? 'remito' : 'carga'} subida correctamente` });
+      setMessage({ type: 'success', text: result.message });
     } catch (error) {
       console.error('Error subiendo imagen:', error);
-      setMessage({ type: 'error', text: 'Error al subir la imagen' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Error al subir la imagen' });
     } finally {
       setIsUploading(false);
     }
@@ -204,14 +195,17 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
     setMessage(null);
 
     try {
-      const { error } = await supabase
-        .schema('mercure').from('shipments')
-        .delete()
-        .eq('id', shipment.id);
+      const response = await fetch(`/api/shipments?id=${shipment.id}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      setMessage({ type: 'success', text: 'Remito eliminado correctamente' });
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al eliminar');
+      }
+
+      setMessage({ type: 'success', text: result.message });
       
       setTimeout(() => {
         router.push('/recepcion');
@@ -219,7 +213,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
       }, 1000);
     } catch (error) {
       console.error('Error eliminando:', error);
-      setMessage({ type: 'error', text: 'Error al eliminar el remito' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Error al eliminar el remito' });
       setShowDeleteConfirm(false);
     } finally {
       setIsDeleting(false);
@@ -232,70 +226,35 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
     setMessage(null);
 
     try {
-      const updateData: Record<string, unknown> = {
-        delivery_note_number: formData.delivery_note_number || null,
-        sender_id: formData.sender_id ? parseInt(formData.sender_id) : null,
-        recipient_id: formData.recipient_id ? parseInt(formData.recipient_id) : null,
-        recipient_address: formData.recipient_address || null,
-        package_quantity: formData.package_quantity ? parseInt(formData.package_quantity) : 0,
-        weight_kg: formData.weight_kg ? parseFloat(formData.weight_kg) : 0,
-        volume_m3: formData.volume_m3 ? parseFloat(formData.volume_m3) : null,
-        declared_value: formData.declared_value ? parseFloat(formData.declared_value) : 0,
-        load_description: formData.load_description || null,
-        paid_by: formData.paid_by || null,
-        payment_terms: formData.payment_terms || null,
-        notes: formData.notes || null,
-      };
-
-      // Si hay nueva cotización (automática o manual), guardarla
+      // Si hay nueva cotización (automática o manual), prepararla
       const finalPrice = useManualPrice && manualPrice 
         ? parseFloat(manualPrice) 
         : newQuotation?.price;
 
-      if (finalPrice && finalPrice > 0) {
-        const recipient = entities.find(e => e.id.toString() === formData.recipient_id);
-        
-        // Crear nueva cotización
-        const { data: newQuot, error: quotError } = await supabase
-          .schema('mercure').from('quotations')
-          .insert({
-            shipment_id: shipment.id,
-            entity_id: formData.recipient_id ? parseInt(formData.recipient_id) : null,
-            customer_name: recipient?.legal_name || 'Desconocido',
-            customer_cuit: recipient?.tax_id || null,
-            origin: 'Buenos Aires',
-            destination: 'Jujuy',
-            weight_kg: formData.weight_kg ? parseFloat(formData.weight_kg) : 0,
-            volume_m3: formData.volume_m3 ? parseFloat(formData.volume_m3) : 0,
-            volumetric_weight_kg: newQuotation?.breakdown?.peso_volumetrico || null,
-            chargeable_weight_kg: newQuotation?.breakdown?.peso_cobrado || null,
-            insurance_value: formData.declared_value ? parseFloat(formData.declared_value) : 0,
-            base_price: useManualPrice ? finalPrice : (newQuotation?.breakdown?.flete_final || finalPrice),
-            insurance_cost: useManualPrice ? 0 : (newQuotation?.breakdown?.seguro || 0),
-            total_price: finalPrice,
-            includes_iva: false,
-            status: 'confirmed',
-            source: useManualPrice ? 'manual' : 'recotizacion',
-            notes: useManualPrice ? 'Precio ingresado manualmente' : null,
-          })
-          .select('id')
-          .single();
+      const newQuotationData = finalPrice && finalPrice > 0 ? {
+        price: finalPrice,
+        breakdown: newQuotation?.breakdown || {},
+        isManual: useManualPrice,
+      } : null;
 
-        if (quotError) {
-          console.error('Error creando cotización:', quotError);
-        } else if (newQuot) {
-          updateData.quotation_id = newQuot.id;
-        }
+      const response = await fetch('/api/shipments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shipmentId: shipment.id,
+          updateData: formData,
+          newQuotation: newQuotationData,
+          entities: entities,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al actualizar');
       }
 
-      const { error } = await supabase
-        .schema('mercure').from('shipments')
-        .update(updateData)
-        .eq('id', shipment.id);
-
-      if (error) throw error;
-
-      setMessage({ type: 'success', text: 'Envío actualizado correctamente' });
+      setMessage({ type: 'success', text: result.message });
       
       // Redirigir después de 1 segundo
       setTimeout(() => {
@@ -305,7 +264,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
 
     } catch (error) {
       console.error('Error updating shipment:', error);
-      setMessage({ type: 'error', text: 'Error al actualizar el envío' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Error al actualizar el envío' });
     } finally {
       setIsSubmitting(false);
     }

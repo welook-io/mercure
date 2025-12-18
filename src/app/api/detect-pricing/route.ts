@@ -16,15 +16,21 @@ function normalizeCity(city: string): string[] {
   
   // Mapeo de variaciones a nombres en la DB
   const mappings: Record<string, string[]> = {
-    'jujuy': ['San Salvador de Jujuy', 'Jujuy'],
-    'san salvador de jujuy': ['San Salvador de Jujuy', 'Jujuy'],
-    'buenos aires': ['Buenos Aires', 'BUENOS AIRES', 'Bs As', 'CABA'],
+    'jujuy': ['San Salvador de Jujuy', 'Jujuy', 'S.S. de Jujuy'],
+    'san salvador de jujuy': ['San Salvador de Jujuy', 'Jujuy', 'S.S. de Jujuy'],
+    's.s. de jujuy': ['San Salvador de Jujuy', 'Jujuy', 'S.S. de Jujuy'],
+    'buenos aires': ['Buenos Aires', 'BUENOS AIRES', 'Bs As', 'CABA', 'Capital Federal'],
+    'bs as': ['Buenos Aires', 'BUENOS AIRES', 'Bs As', 'CABA'],
+    'caba': ['Buenos Aires', 'BUENOS AIRES', 'Bs As', 'CABA'],
     'cordoba': ['Córdoba', 'Cordoba', 'CORDOBA'],
     'córdoba': ['Córdoba', 'Cordoba', 'CORDOBA'],
     'rosario': ['Rosario', 'ROSARIO'],
-    'salta': ['Salta', 'SALTA'],
-    'tucuman': ['Tucumán', 'Tucuman', 'TUCUMAN'],
-    'tucumán': ['Tucumán', 'Tucuman', 'TUCUMAN'],
+    'salta': ['Salta', 'SALTA', 'Salta Capital'],
+    'salta capital': ['Salta', 'SALTA', 'Salta Capital'],
+    'tucuman': ['Tucumán', 'Tucuman', 'TUCUMAN', 'San Miguel de Tucumán'],
+    'tucumán': ['Tucumán', 'Tucuman', 'TUCUMAN', 'San Miguel de Tucumán'],
+    'san miguel de tucuman': ['Tucumán', 'Tucuman', 'San Miguel de Tucumán'],
+    'san miguel de tucumán': ['Tucumán', 'Tucuman', 'San Miguel de Tucumán'],
     'mendoza': ['Mendoza', 'MENDOZA'],
     'lanus': ['Lanús', 'Lanus', 'LANUS'],
     'lanús': ['Lanús', 'Lanus', 'LANUS'],
@@ -292,26 +298,29 @@ async function buscarTarifa(
     }
   }
   
-  // Fallback: buscar cualquier tarifa que cubra el peso (sin filtrar origen/destino)
-  console.log(`[detect-pricing] No hay tarifa específica para ${origin}->${destination}, buscando genérica...`);
+  // Fallback: intentar solo con el origen (cualquier destino del mismo origen)
+  console.log(`[detect-pricing] No hay tarifa específica para ${origin}->${destination}, buscando por origen...`);
   
-  const { data: fallbackTariff } = await mercure()
-    .from('tariffs')
-    .select('*')
-    .neq('tariff_type', 'volume')
-    .gte('weight_to_kg', weightBucket)
-    .order('weight_to_kg', { ascending: true })
-    .limit(1)
-    .single();
-  
-  if (fallbackTariff) {
-    return { 
-      tarifa: fallbackTariff, 
-      debug: `FALLBACK (sin match origen/destino): ${fallbackTariff.origin} -> ${fallbackTariff.destination}, ${fallbackTariff.weight_to_kg}kg = $${fallbackTariff.price}` 
-    };
+  for (const orig of originsToTry) {
+    const { data: fallbackTariff } = await mercure()
+      .from('tariffs')
+      .select('*')
+      .ilike('origin', orig)
+      .neq('tariff_type', 'volume')
+      .gte('weight_to_kg', weightBucket)
+      .order('weight_to_kg', { ascending: true })
+      .limit(1)
+      .single();
+    
+    if (fallbackTariff) {
+      return { 
+        tarifa: fallbackTariff, 
+        debug: `FALLBACK (mismo origen, destino diferente): ${fallbackTariff.origin} -> ${fallbackTariff.destination}, ${fallbackTariff.weight_to_kg}kg = $${fallbackTariff.price}. NOTA: No hay tarifa para ${destination}.` 
+      };
+    }
   }
   
-  return { tarifa: null, debug: `NO ENCONTRADA para ${weightBucket}kg` };
+  return { tarifa: null, debug: `NO ENCONTRADA para ${origin} -> ${destination}, ${weightBucket}kg. Agregar tarifario para esta ruta.` };
 }
 
 // Calcular peso a cobrar

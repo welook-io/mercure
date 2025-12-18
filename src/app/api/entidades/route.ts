@@ -18,6 +18,163 @@ interface CreateEntityRequest {
   };
 }
 
+// GET: Obtener lista de entidades
+export async function GET(request: NextRequest) {
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const fields = searchParams.get('fields') || 'id, legal_name, tax_id, entity_type, payment_terms, email, phone, address';
+    const withBalances = searchParams.get('withBalances') === 'true';
+
+    let query = supabaseAdmin
+      .schema('mercure')
+      .from('entities');
+
+    if (withBalances) {
+      // Incluir campos de saldo inicial
+      const { data, error } = await query
+        .select('id, legal_name, tax_id, initial_balance, initial_balance_date, payment_terms')
+        .order('legal_name');
+      
+      if (error) {
+        console.error('Error fetching entities:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      
+      return NextResponse.json({ entities: data || [] });
+    }
+
+    const { data, error } = await query
+      .select(fields)
+      .order('legal_name');
+
+    if (error) {
+      console.error('Error fetching entities:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ entities: data || [] });
+
+  } catch (error) {
+    console.error('Error in GET /api/entidades:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT: Actualizar entidad(es)
+export async function PUT(request: NextRequest) {
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+  }
+
+  try {
+    const body = await request.json();
+
+    // Modo batch: actualizar múltiples saldos iniciales
+    if (body.balanceUpdates && Array.isArray(body.balanceUpdates)) {
+      const updates = body.balanceUpdates as Array<{
+        id: number;
+        initial_balance: number;
+        initial_balance_date: string | null;
+      }>;
+
+      for (const update of updates) {
+        const { error } = await supabaseAdmin
+          .schema('mercure')
+          .from('entities')
+          .update({
+            initial_balance: update.initial_balance,
+            initial_balance_date: update.initial_balance_date,
+          })
+          .eq('id', update.id);
+
+        if (error) {
+          console.error('Error updating entity balance:', error);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        message: `${updates.length} saldos actualizados correctamente` 
+      });
+    }
+
+    // Modo single: actualizar una entidad
+    if (body.id) {
+      const { id, commercial_terms, ...entityData } = body;
+
+      const { error: updateError } = await supabaseAdmin
+        .schema('mercure')
+        .from('entities')
+        .update({
+          legal_name: entityData.legal_name,
+          tax_id: entityData.tax_id || null,
+          entity_type: entityData.entity_type || null,
+          payment_terms: entityData.payment_terms || null,
+          email: entityData.email || null,
+          phone: entityData.phone || null,
+          address: entityData.address || null,
+          notes: entityData.notes || null,
+        })
+        .eq('id', id);
+
+      if (updateError) {
+        console.error('Error updating entity:', updateError);
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+
+      // Manejar términos comerciales
+      if (commercial_terms !== undefined) {
+        if (commercial_terms === null) {
+          // Eliminar términos comerciales
+          await supabaseAdmin
+            .schema('mercure')
+            .from('client_commercial_terms')
+            .delete()
+            .eq('entity_id', id);
+        } else {
+          // Upsert términos comerciales
+          const { error: termsError } = await supabaseAdmin
+            .schema('mercure')
+            .from('client_commercial_terms')
+            .upsert({
+              entity_id: id,
+              tariff_modifier: commercial_terms.tariff_modifier,
+              insurance_rate: commercial_terms.insurance_rate,
+              credit_days: commercial_terms.credit_days,
+              is_active: true,
+            }, { onConflict: 'entity_id' });
+          
+          if (termsError) {
+            console.error('Error upserting commercial terms:', termsError);
+          }
+        }
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Entidad actualizada correctamente' 
+      });
+    }
+
+    return NextResponse.json({ error: 'ID de entidad requerido' }, { status: 400 });
+
+  } catch (error) {
+    console.error('Error in PUT /api/entidades:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error interno' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!supabaseAdmin) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 500 });

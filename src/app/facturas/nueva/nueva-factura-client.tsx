@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { Loader2, FileText, Send, CheckCircle2, AlertCircle, Building2, Hash } from "lucide-react";
 import { useRouter } from "next/navigation";
 

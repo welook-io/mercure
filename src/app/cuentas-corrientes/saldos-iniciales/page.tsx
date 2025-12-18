@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
-import { supabase } from "@/lib/supabase";
 import { Loader2, Save, ArrowLeft, DollarSign, Search } from "lucide-react";
 import Link from "next/link";
 
@@ -38,12 +37,14 @@ export default function SaldosInicialesPage() {
   }, []);
 
   async function loadEntities() {
-    const { data } = await supabase
-      .schema('mercure').from('entities')
-      .select('id, legal_name, tax_id, initial_balance, initial_balance_date, payment_terms')
-      .order('legal_name');
-    
-    setEntities(data || []);
+    try {
+      const response = await fetch('/api/entidades?withBalances=true');
+      const data = await response.json();
+      setEntities(data.entities || []);
+    } catch (error) {
+      console.error('Error loading entities:', error);
+      setEntities([]);
+    }
     setLoading(false);
   }
 
@@ -74,29 +75,29 @@ export default function SaldosInicialesPage() {
     setMessage(null);
 
     try {
-      const updates = Object.entries(changes).map(([id, data]) => ({
+      const balanceUpdates = Object.entries(changes).map(([id, data]) => ({
         id: parseInt(id),
         initial_balance: parseFloat(data.balance) || 0,
         initial_balance_date: data.date || null,
       }));
 
-      for (const update of updates) {
-        const { error } = await supabase
-          .schema('mercure').from('entities')
-          .update({
-            initial_balance: update.initial_balance,
-            initial_balance_date: update.initial_balance_date,
-          })
-          .eq('id', update.id);
+      const response = await fetch('/api/entidades', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ balanceUpdates }),
+      });
 
-        if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al guardar');
       }
 
-      setMessage({ type: 'success', text: `${updates.length} saldos actualizados correctamente` });
+      setMessage({ type: 'success', text: result.message || `${balanceUpdates.length} saldos actualizados correctamente` });
       setChanges({});
       loadEntities();
     } catch (error) {
-      setMessage({ type: 'error', text: 'Error al guardar los cambios' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Error al guardar los cambios' });
     } finally {
       setSaving(false);
     }

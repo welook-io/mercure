@@ -908,9 +908,10 @@ function NuevaRecepcionContent() {
                 />
               </div>
 
-              {/* Destinatario (Cliente) */}
-              <div className="bg-neutral-50 px-3 py-2 border-t border-b border-neutral-200 flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+              {/* Destinatario (Cliente) - Sección destacada */}
+              <div className="bg-orange-50 px-3 py-2 border-t border-b border-orange-200 flex items-center justify-between">
+                <span className="text-xs font-medium text-orange-700 uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
                   Destino / Cliente
                 </span>
                 <div className="flex items-center gap-2">
@@ -1295,7 +1296,9 @@ function NuevaRecepcionContent() {
                       onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
                       className="h-8 w-full px-2 text-sm border border-neutral-200 rounded bg-white focus:border-neutral-400 focus:outline-none"
                     >
-                      <option value="contado">Contado (Contra entrega)</option>
+                      <option value="contado">
+                        {formData.paidBy === 'destino' ? 'Contado (Contra entrega)' : 'Contado (Pago en origen)'}
+                      </option>
                       <option value="cuenta_corriente">Cuenta Corriente</option>
                     </select>
                   </div>
@@ -1346,8 +1349,8 @@ function NuevaRecepcionContent() {
               </div>
             </div>
 
-            {/* Acciones */}
-            <div className="flex items-center justify-end gap-3 mt-4">
+            {/* Acciones - con padding bottom para no superponerse al chat flotante */}
+            <div className="flex items-center justify-end gap-3 mt-4 pb-16">
               <Link href={isCotizarMode ? "/tarifas" : "/recepcion"}>
                 <Button
                   type="button"
