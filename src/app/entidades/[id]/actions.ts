@@ -86,3 +86,4 @@ export async function deleteCommercialTerms(entityId: number) {
   return { success: true };
 }
 
+

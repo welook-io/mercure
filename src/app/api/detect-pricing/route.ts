@@ -70,6 +70,22 @@ interface DebugInfo {
   };
 }
 
+// Tarifa especial por cliente
+interface SpecialTariff {
+  id: number;
+  name: string;
+  description: string | null;
+  condition_type: string;
+  condition_values: Record<string, any>;
+  pricing_type: string;
+  pricing_values: Record<string, any>;
+  origin: string | null;
+  destination: string | null;
+  priority: number;
+  matches: boolean;
+  matchReason?: string;
+}
+
 interface PricingResult {
   path: PricingPath;
   pathName: string;
@@ -91,6 +107,7 @@ interface PricingResult {
     breakdown?: Record<string, number>;
     quotationId?: number;
     tariffId?: number;
+    specialTariffId?: number;
     validUntil?: string;
   };
   quotation?: {
@@ -109,6 +126,10 @@ interface PricingResult {
     insuranceRate: number;
     creditDays: number;
   };
+  // Tarifas especiales disponibles para este cliente
+  specialTariffs?: SpecialTariff[];
+  // Tarifa especial aplicada automáticamente (si matchea)
+  appliedSpecialTariff?: SpecialTariff;
   debug?: DebugInfo;
 }
 
@@ -340,11 +361,20 @@ async function handlePathA(
   const tariffModifier = parseFloat(terms?.tariff_modifier || '0');
   const insuranceRate = parseFloat(terms?.insurance_rate || String(DEFAULT_INSURANCE_RATE));
 
+  // Buscar tarifas especiales del cliente
+  const { tariffs: specialTariffs, matched: matchedSpecialTariff } = await findSpecialTariffs(
+    client.id,
+    cargo,
+    cargo.origin,
+    cargo.destination
+  );
+
   // Calcular peso a cobrar
   const { pesoReal, pesoVolumetrico, pesoACobrar, usaVolumen, explicacion } = calcularPesoACobrar(cargo);
   
   let price: number | null = null;
   let breakdown: Record<string, number> = {};
+  let specialTariffId: number | undefined = undefined;
   let debug: DebugInfo = {
     input: debugInput,
     decision: {
@@ -387,52 +417,84 @@ async function handlePathA(
         queryUsada: tarifaDebug,
       };
 
-      breakdown.flete_lista = basePrice;
-      breakdown.peso_cobrado = pesoACobrar;
-      breakdown.tipo_tarifa = usaVolumen ? 2 : 0;
+      // Si hay tarifa especial que matchea, usarla
+      if (matchedSpecialTariff) {
+        const resultado = calcularPrecioEspecial(
+          matchedSpecialTariff,
+          cargo,
+          basePrice,
+          insuranceRate
+        );
+        price = resultado.price;
+        breakdown = resultado.breakdown;
+        specialTariffId = matchedSpecialTariff.id;
+        
+        debug.calculo = {
+          fleteLista: basePrice,
+          fleteConModificador: resultado.price,
+          valorDeclarado: cargo.declaredValue || 0,
+          tasaSeguro: insuranceRate,
+          seguro: breakdown.seguro || 0,
+          total: resultado.price,
+          formula: resultado.formula,
+        };
+      } else {
+        // Usar tarifa base con modificador comercial
+        breakdown.flete_lista = basePrice;
+        breakdown.peso_cobrado = pesoACobrar;
+        breakdown.tipo_tarifa = usaVolumen ? 2 : 0;
 
-      let fleteConModificador = basePrice;
-      if (tariffModifier !== 0) {
-        const modificadorMonto = basePrice * (tariffModifier / 100);
-        breakdown.descuento = modificadorMonto;
-        fleteConModificador = basePrice + modificadorMonto;
-        debug.calculo.modificador = tariffModifier;
+        let fleteConModificador = basePrice;
+        if (tariffModifier !== 0) {
+          const modificadorMonto = basePrice * (tariffModifier / 100);
+          breakdown.descuento = modificadorMonto;
+          fleteConModificador = basePrice + modificadorMonto;
+          debug.calculo.modificador = tariffModifier;
+        }
+        breakdown.flete_final = fleteConModificador;
+
+        let seguro = 0;
+        if (cargo.declaredValue && insuranceRate > 0) {
+          seguro = cargo.declaredValue * insuranceRate;
+          breakdown.seguro = seguro;
+        }
+
+        price = fleteConModificador + seguro;
+
+        // Debug del cálculo
+        debug.calculo = {
+          fleteLista: basePrice,
+          modificador: tariffModifier !== 0 ? tariffModifier : undefined,
+          fleteConModificador,
+          valorDeclarado: cargo.declaredValue || 0,
+          tasaSeguro: insuranceRate,
+          seguro,
+          total: price,
+          formula: tariffModifier !== 0 
+            ? `$${basePrice.toLocaleString()} (flete) ${tariffModifier > 0 ? '+' : ''}${tariffModifier}% = $${fleteConModificador.toLocaleString()} + $${seguro.toLocaleString()} (seguro ${(insuranceRate * 100).toFixed(1)}‰) = $${price.toLocaleString()}`
+            : `$${basePrice.toLocaleString()} (flete) + $${seguro.toLocaleString()} (seguro ${(insuranceRate * 1000).toFixed(0)}‰) = $${price.toLocaleString()}`,
+        };
       }
-      breakdown.flete_final = fleteConModificador;
-
-      let seguro = 0;
-      if (cargo.declaredValue && insuranceRate > 0) {
-        seguro = cargo.declaredValue * insuranceRate;
-        breakdown.seguro = seguro;
-      }
-
-      price = fleteConModificador + seguro;
-
-      // Debug del cálculo
-      debug.calculo = {
-        fleteLista: basePrice,
-        modificador: tariffModifier !== 0 ? tariffModifier : undefined,
-        fleteConModificador,
-        valorDeclarado: cargo.declaredValue || 0,
-        tasaSeguro: insuranceRate,
-        seguro,
-        total: price,
-        formula: tariffModifier !== 0 
-          ? `$${basePrice.toLocaleString()} (flete) ${tariffModifier > 0 ? '+' : ''}${tariffModifier}% = $${fleteConModificador.toLocaleString()} + $${seguro.toLocaleString()} (seguro ${(insuranceRate * 100).toFixed(1)}‰) = $${price.toLocaleString()}`
-          : `$${basePrice.toLocaleString()} (flete) + $${seguro.toLocaleString()} (seguro ${(insuranceRate * 1000).toFixed(0)}‰) = $${price.toLocaleString()}`,
-      };
     } else {
       debug.tarifa.queryUsada = tarifaDebug;
     }
   }
 
+  // Tag personalizado si aplica tarifa especial
+  const tagLabel = matchedSpecialTariff 
+    ? `⭐ ${matchedSpecialTariff.name.toUpperCase()}`
+    : 'CTA CTE';
+  const tagDescription = matchedSpecialTariff
+    ? `Tarifa especial: ${matchedSpecialTariff.description || matchedSpecialTariff.name}`
+    : `Cliente con contrato - Facturar a fin de mes${tariffModifier !== 0 ? ` (${tariffModifier}%)` : ''}`;
+
   return {
     path: 'A',
-    pathName: 'Cuenta Corriente',
+    pathName: matchedSpecialTariff ? 'Tarifa Especial' : 'Cuenta Corriente',
     tag: {
       color: 'green',
-      label: 'CTA CTE',
-      description: `Cliente con contrato - Facturar a fin de mes${tariffModifier !== 0 ? ` (${tariffModifier}%)` : ''}`
+      label: tagLabel,
+      description: tagDescription
     },
     client: {
       id: client.id,
@@ -442,10 +504,11 @@ async function handlePathA(
       type: 'regular'
     },
     pricing: {
-      source: 'contract',
+      source: matchedSpecialTariff ? 'special_tariff' : 'contract',
       price,
       breakdown,
-      tariffId: client.assigned_tariff_id
+      tariffId: client.assigned_tariff_id,
+      specialTariffId,
     },
     commercialTerms: terms ? {
       tariffType: terms.tariff_type,
@@ -453,6 +516,9 @@ async function handlePathA(
       insuranceRate: insuranceRate,
       creditDays: terms.credit_days
     } : undefined,
+    // Incluir todas las tarifas especiales disponibles (para mostrar en UI)
+    specialTariffs: specialTariffs.length > 0 ? specialTariffs : undefined,
+    appliedSpecialTariff: matchedSpecialTariff || undefined,
     debug,
   };
 }
@@ -663,6 +729,203 @@ async function handlePathC(
     },
     debug,
   };
+}
+
+// Buscar tarifas especiales del cliente
+async function findSpecialTariffs(
+  entityId: number,
+  cargo: { packageQuantity?: number; weightKg?: number; volumeM3?: number; tipoCarga?: string },
+  origin?: string,
+  destination?: string
+): Promise<{ tariffs: SpecialTariff[]; matched: SpecialTariff | null }> {
+  
+  // Buscar todas las tarifas especiales activas del cliente
+  const { data: tariffs } = await mercure()
+    .from('client_special_tariffs')
+    .select('*')
+    .eq('entity_id', entityId)
+    .eq('is_active', true)
+    .lte('valid_from', new Date().toISOString().split('T')[0])
+    .order('priority', { ascending: false });
+  
+  if (!tariffs || tariffs.length === 0) {
+    return { tariffs: [], matched: null };
+  }
+  
+  const originsToTry = origin ? normalizeCity(origin) : [];
+  const destinationsToTry = destination ? normalizeCity(destination) : [];
+  
+  // Evaluar cada tarifa especial
+  const evaluatedTariffs: SpecialTariff[] = tariffs.map((t: any) => {
+    let matches = true;
+    let matchReason = '';
+    
+    // Verificar vigencia
+    if (t.valid_until && new Date(t.valid_until) < new Date()) {
+      matches = false;
+      matchReason = 'Tarifa vencida';
+    }
+    
+    // Verificar ruta (si está definida)
+    if (matches && t.origin) {
+      const tarifaOriginsNorm = normalizeCity(t.origin);
+      const routeMatches = originsToTry.some(o => 
+        tarifaOriginsNorm.some(to => to.toLowerCase() === o.toLowerCase())
+      );
+      if (!routeMatches) {
+        matches = false;
+        matchReason = `Origen no coincide (esperado: ${t.origin})`;
+      }
+    }
+    
+    if (matches && t.destination) {
+      const tarifaDestsNorm = normalizeCity(t.destination);
+      const routeMatches = destinationsToTry.some(d => 
+        tarifaDestsNorm.some(td => td.toLowerCase() === d.toLowerCase())
+      );
+      if (!routeMatches) {
+        matches = false;
+        matchReason = `Destino no coincide (esperado: ${t.destination})`;
+      }
+    }
+    
+    // Evaluar condiciones
+    if (matches) {
+      const conditions = t.condition_values || {};
+      
+      switch (t.condition_type) {
+        case 'peso_minimo':
+          if (conditions.peso_minimo_kg && (cargo.weightKg || 0) < conditions.peso_minimo_kg) {
+            matches = false;
+            matchReason = `Peso ${cargo.weightKg || 0}kg < mínimo ${conditions.peso_minimo_kg}kg`;
+          } else if (conditions.peso_minimo_kg) {
+            matchReason = `Peso ${cargo.weightKg}kg ≥ mínimo ${conditions.peso_minimo_kg}kg`;
+          }
+          break;
+          
+        case 'volumen_minimo':
+          if (conditions.volumen_minimo_m3 && (cargo.volumeM3 || 0) < conditions.volumen_minimo_m3) {
+            matches = false;
+            matchReason = `Volumen ${cargo.volumeM3 || 0}m³ < mínimo ${conditions.volumen_minimo_m3}m³`;
+          } else if (conditions.volumen_minimo_m3) {
+            matchReason = `Volumen ${cargo.volumeM3}m³ ≥ mínimo ${conditions.volumen_minimo_m3}m³`;
+          }
+          break;
+          
+        case 'bultos_minimo':
+          if (conditions.bultos_minimo && (cargo.packageQuantity || 0) < conditions.bultos_minimo) {
+            matches = false;
+            matchReason = `Bultos ${cargo.packageQuantity || 0} < mínimo ${conditions.bultos_minimo}`;
+          } else if (conditions.bultos_minimo) {
+            matchReason = `Bultos ${cargo.packageQuantity} ≥ mínimo ${conditions.bultos_minimo}`;
+          }
+          break;
+          
+        case 'tipo_carga':
+          // Tipo de carga se evalúa como sugerencia (no bloquea)
+          matchReason = `Tipo de carga: ${conditions.tipo || 'cualquiera'}`;
+          break;
+          
+        case 'cualquiera':
+          // Siempre aplica
+          matchReason = 'Aplica a cualquier envío';
+          break;
+          
+        default:
+          matchReason = 'Condición personalizada';
+      }
+    }
+    
+    return {
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      condition_type: t.condition_type,
+      condition_values: t.condition_values,
+      pricing_type: t.pricing_type,
+      pricing_values: t.pricing_values,
+      origin: t.origin,
+      destination: t.destination,
+      priority: t.priority,
+      matches,
+      matchReason,
+    };
+  });
+  
+  // Ordenar por prioridad (mayor primero) y encontrar la primera que matchea
+  const sortedTariffs = evaluatedTariffs.sort((a, b) => b.priority - a.priority);
+  const matched = sortedTariffs.find(t => t.matches) || null;
+  
+  return { tariffs: sortedTariffs, matched };
+}
+
+// Calcular precio con tarifa especial
+function calcularPrecioEspecial(
+  specialTariff: SpecialTariff,
+  cargo: { weightKg?: number; volumeM3?: number; declaredValue?: number },
+  tarifaBase: number,
+  insuranceRate: number
+): { price: number; breakdown: Record<string, number>; formula: string } {
+  const pv = specialTariff.pricing_values || {};
+  let price = 0;
+  let breakdown: Record<string, number> = {};
+  let formula = '';
+  
+  switch (specialTariff.pricing_type) {
+    case 'fijo':
+      price = pv.precio || 0;
+      breakdown.tarifa_especial = price;
+      formula = `TARIFA ESPECIAL "${specialTariff.name}": $${price.toLocaleString()} (precio fijo)`;
+      break;
+      
+    case 'por_kg':
+      const precioPorKg = pv.precio_kg || 0;
+      const minimo = pv.minimo || 0;
+      const pesoKg = cargo.weightKg || 0;
+      const precioCalculado = pesoKg * precioPorKg;
+      price = Math.max(precioCalculado, minimo);
+      breakdown.peso_kg = pesoKg;
+      breakdown.precio_kg = precioPorKg;
+      breakdown.tarifa_especial = price;
+      formula = `TARIFA ESPECIAL "${specialTariff.name}": ${pesoKg}kg × $${precioPorKg}/kg = $${precioCalculado.toLocaleString()}${minimo > precioCalculado ? ` → mínimo $${minimo.toLocaleString()}` : ''}`;
+      break;
+      
+    case 'descuento_porcentaje':
+      const porcentaje = pv.porcentaje || 0;
+      const descuento = tarifaBase * (porcentaje / 100);
+      price = tarifaBase + descuento; // porcentaje es negativo para descuento
+      breakdown.tarifa_base = tarifaBase;
+      breakdown.descuento_porcentaje = porcentaje;
+      breakdown.descuento_monto = descuento;
+      breakdown.tarifa_especial = price;
+      formula = `TARIFA ESPECIAL "${specialTariff.name}": $${tarifaBase.toLocaleString()} ${porcentaje}% = $${price.toLocaleString()}`;
+      break;
+      
+    case 'descuento_monto':
+      const montoDescuento = pv.monto || 0;
+      price = tarifaBase + montoDescuento; // monto es negativo para descuento
+      breakdown.tarifa_base = tarifaBase;
+      breakdown.descuento_monto = montoDescuento;
+      breakdown.tarifa_especial = price;
+      formula = `TARIFA ESPECIAL "${specialTariff.name}": $${tarifaBase.toLocaleString()} ${montoDescuento > 0 ? '+' : ''}$${montoDescuento.toLocaleString()} = $${price.toLocaleString()}`;
+      break;
+      
+    default:
+      price = tarifaBase;
+      breakdown.tarifa_base = tarifaBase;
+      formula = `Tarifa base: $${tarifaBase.toLocaleString()}`;
+  }
+  
+  // Agregar seguro
+  let seguro = 0;
+  if (cargo.declaredValue && insuranceRate > 0) {
+    seguro = cargo.declaredValue * insuranceRate;
+    breakdown.seguro = seguro;
+    price += seguro;
+    formula += ` + $${seguro.toLocaleString()} (seguro) = $${price.toLocaleString()}`;
+  }
+  
+  return { price, breakdown, formula };
 }
 
 // Buscar cotización pendiente

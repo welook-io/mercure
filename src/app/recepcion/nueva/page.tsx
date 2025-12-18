@@ -176,6 +176,22 @@ function NuevaRecepcionContent() {
     };
   }
   
+  // Tarifa especial disponible
+  interface SpecialTariff {
+    id: number;
+    name: string;
+    description: string | null;
+    condition_type: string;
+    condition_values: Record<string, any>;
+    pricing_type: string;
+    pricing_values: Record<string, any>;
+    origin: string | null;
+    destination: string | null;
+    priority: number;
+    matches: boolean;
+    matchReason?: string;
+  }
+
   interface PricingInfo {
     path: 'A' | 'B' | 'C';
     pathName: string;
@@ -185,6 +201,7 @@ function NuevaRecepcionContent() {
       price: number | null; 
       quotationId?: number;
       breakdown?: Record<string, number>;
+      specialTariffId?: number;
     };
     validation?: { needsReview: boolean; reason?: string };
     commercialTerms?: {
@@ -193,9 +210,14 @@ function NuevaRecepcionContent() {
       insuranceRate: number;
       creditDays?: number;
     };
+    // Tarifas especiales disponibles para este cliente
+    specialTariffs?: SpecialTariff[];
+    // Tarifa especial aplicada automáticamente
+    appliedSpecialTariff?: SpecialTariff;
     debug?: DebugInfo;
   }
   const [pricingInfo, setPricingInfo] = useState<PricingInfo | null>(null);
+  const [showSpecialTariffs, setShowSpecialTariffs] = useState(false);
   const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
   const [showFormulaDetails, setShowFormulaDetails] = useState(false);
   
@@ -929,6 +951,77 @@ function NuevaRecepcionContent() {
                 </div>
               )}
               
+              {/* Tarifas especiales disponibles */}
+              {pricingInfo?.specialTariffs && pricingInfo.specialTariffs.length > 0 && (
+                <div className="px-3 py-2 bg-orange-50 border-b border-orange-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-orange-800 flex items-center gap-1">
+                      ⭐ Arreglos disponibles para este cliente
+                      {pricingInfo.appliedSpecialTariff && (
+                        <span className="ml-2 px-1.5 py-0.5 bg-orange-500 text-white rounded text-[10px]">
+                          Aplicado: {pricingInfo.appliedSpecialTariff.name}
+                        </span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSpecialTariffs(!showSpecialTariffs)}
+                      className="text-xs text-orange-600 hover:text-orange-800"
+                    >
+                      {showSpecialTariffs ? 'Ocultar' : 'Ver todos'}
+                    </button>
+                  </div>
+                  
+                  {showSpecialTariffs && (
+                    <div className="space-y-1.5 mt-2">
+                      {pricingInfo.specialTariffs.map((st) => (
+                        <div
+                          key={st.id}
+                          className={`p-2 rounded border text-xs ${
+                            st.matches 
+                              ? 'bg-green-50 border-green-200' 
+                              : 'bg-white border-neutral-200 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{st.name}</span>
+                            <span className={`px-1.5 py-0.5 rounded ${
+                              st.matches 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-neutral-100 text-neutral-500'
+                            }`}>
+                              {st.matches ? '✓ Aplica' : 'No aplica'}
+                            </span>
+                          </div>
+                          {st.matchReason && (
+                            <p className="text-neutral-500 mt-0.5">{st.matchReason}</p>
+                          )}
+                          {st.description && (
+                            <p className="text-neutral-400 mt-0.5">{st.description}</p>
+                          )}
+                          <div className="mt-1 flex items-center gap-2 text-[10px] text-neutral-400">
+                            <span>
+                              Precio: {st.pricing_type === 'fijo' 
+                                ? `$${(st.pricing_values.precio || 0).toLocaleString()}`
+                                : st.pricing_type === 'por_kg'
+                                ? `$${st.pricing_values.precio_kg}/kg`
+                                : st.pricing_type === 'descuento_porcentaje'
+                                ? `${st.pricing_values.porcentaje}%`
+                                : st.pricing_type === 'descuento_monto'
+                                ? `-$${Math.abs(st.pricing_values.monto || 0).toLocaleString()}`
+                                : '-'
+                              }
+                            </span>
+                            {st.origin && <span>• Desde: {st.origin}</span>}
+                            {st.destination && <span>• A: {st.destination}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {/* Sugerencias de destinatario */}
               {recipientStatus === 'not_found' && recipientSuggestions.length > 0 && (
                 <div className="p-3 bg-amber-50 border-b border-amber-200">
@@ -1307,5 +1400,6 @@ function NuevaRecepcionContent() {
     </div>
   );
 }
+
 
 

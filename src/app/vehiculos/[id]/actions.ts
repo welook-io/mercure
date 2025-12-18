@@ -71,3 +71,4 @@ export async function deleteVehicleEvent(eventId: number) {
   return { success: true };
 }
 
+

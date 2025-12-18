@@ -59,3 +59,4 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
   );
 }
 
+

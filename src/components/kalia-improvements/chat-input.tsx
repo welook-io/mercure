@@ -80,3 +80,4 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   );
 }
 
+

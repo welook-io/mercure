@@ -84,3 +84,4 @@ COMMENT ON TABLE mercure.commercial_agreement_requests IS
 Flujo: Comercial (pending_review) → Fernando (approved/rejected) → Administrativo (configured)';
 
 
+

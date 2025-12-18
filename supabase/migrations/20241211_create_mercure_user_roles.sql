@@ -87,3 +87,4 @@ COMMENT ON COLUMN public.mercure_user_roles.role IS 'Rol del usuario: admin, adm
 COMMENT ON COLUMN public.mercure_user_roles.is_active IS 'Si el rol está activo. Desactivar en lugar de borrar para historial';
 
 
+

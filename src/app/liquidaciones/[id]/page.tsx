@@ -220,3 +220,4 @@ export default async function LiquidacionDetailPage({ params }: { params: Promis
   );
 }
 
+

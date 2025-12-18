@@ -73,3 +73,4 @@ COMMENT ON COLUMN public.mercure_audit_logs.target_id IS 'ID de la entidad afect
 COMMENT ON COLUMN public.mercure_audit_logs.old_value IS 'Valor anterior (para updates)';
 COMMENT ON COLUMN public.mercure_audit_logs.new_value IS 'Nuevo valor (para creates/updates)';
 
+

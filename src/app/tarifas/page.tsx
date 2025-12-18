@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { requireAuth } from "@/lib/auth";
 import Link from "next/link";
 import { TariffTable } from "./tariff-table";
+import { SpecialTariffsTable } from "./special-tariffs-table";
 
 async function getTariffs() {
   const { data } = await supabaseAdmin!
@@ -35,13 +36,24 @@ async function getQuotations() {
   return data || [];
 }
 
+async function getRegularClients() {
+  const { data } = await supabaseAdmin!
+    .schema('mercure')
+    .from('entities')
+    .select('id, legal_name, tax_id')
+    .or('client_type.eq.regular,payment_terms.eq.cuenta_corriente')
+    .order('legal_name', { ascending: true });
+  return data || [];
+}
+
 export default async function TarifasPage() {
   await requireAuth("/tarifas");
 
-  const [tariffs, insuranceRates, quotations] = await Promise.all([
+  const [tariffs, insuranceRates, quotations, regularClients] = await Promise.all([
     getTariffs(),
     getInsuranceRates(),
-    getQuotations()
+    getQuotations(),
+    getRegularClients()
   ]);
 
   return (
@@ -65,14 +77,22 @@ export default async function TarifasPage() {
             </div>
           </div>
 
-          {/* Tarifas */}
-          <div className="mb-6">
-            <h2 className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
-              Tarifas Vigentes
-              <span className="ml-2 text-neutral-400 font-normal normal-case hidden sm:inline">(click en precio para editar)</span>
-            </h2>
-            <TariffTable initialTariffs={tariffs as any} />
-          </div>
+          {/* Tarifas Especiales por Cliente */}
+          <SpecialTariffsTable initialEntities={regularClients as any} />
+
+          {/* Tarifas Base (colapsable) */}
+          <details className="mb-6 group">
+            <summary className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2 cursor-pointer list-none flex items-center gap-2 hover:text-neutral-700">
+              <svg className="h-3.5 w-3.5 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Tarifas Base (Lista de Precios)
+              <span className="text-neutral-400 font-normal normal-case hidden sm:inline">(click en precio para editar)</span>
+            </summary>
+            <div className="mt-2">
+              <TariffTable initialTariffs={tariffs as any} />
+            </div>
+          </details>
 
           {/* Seguro y Cotizaciones en dos columnas */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

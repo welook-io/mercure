@@ -94,3 +94,4 @@ COMMENT ON COLUMN public.mercure_user_permissions.has_access IS 'Si el usuario t
 -- whatsapp, campanas, redes, agenda, reportes_mkt
 -- configuracion, procesos
 
+

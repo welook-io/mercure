@@ -54,6 +54,8 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [quotation, setQuotation] = useState<QuotationData | null>(null);
   const [newQuotation, setNewQuotation] = useState<{ price: number; breakdown: Record<string, number> } | null>(null);
+  const [manualPrice, setManualPrice] = useState<string>('');
+  const [useManualPrice, setUseManualPrice] = useState(false);
   
   // Estados para imágenes
   const [remitoImageUrl, setRemitoImageUrl] = useState<string | null>(shipment.remito_image_url);
@@ -245,8 +247,12 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
         notes: formData.notes || null,
       };
 
-      // Si hay nueva cotización, guardarla
-      if (newQuotation) {
+      // Si hay nueva cotización (automática o manual), guardarla
+      const finalPrice = useManualPrice && manualPrice 
+        ? parseFloat(manualPrice) 
+        : newQuotation?.price;
+
+      if (finalPrice && finalPrice > 0) {
         const recipient = entities.find(e => e.id.toString() === formData.recipient_id);
         
         // Crear nueva cotización
@@ -261,15 +267,16 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
             destination: 'Jujuy',
             weight_kg: formData.weight_kg ? parseFloat(formData.weight_kg) : 0,
             volume_m3: formData.volume_m3 ? parseFloat(formData.volume_m3) : 0,
-            volumetric_weight_kg: newQuotation.breakdown?.peso_volumetrico || null,
-            chargeable_weight_kg: newQuotation.breakdown?.peso_cobrado || null,
+            volumetric_weight_kg: newQuotation?.breakdown?.peso_volumetrico || null,
+            chargeable_weight_kg: newQuotation?.breakdown?.peso_cobrado || null,
             insurance_value: formData.declared_value ? parseFloat(formData.declared_value) : 0,
-            base_price: newQuotation.breakdown?.flete_final || newQuotation.price,
-            insurance_cost: newQuotation.breakdown?.seguro || 0,
-            total_price: newQuotation.price,
+            base_price: useManualPrice ? finalPrice : (newQuotation?.breakdown?.flete_final || finalPrice),
+            insurance_cost: useManualPrice ? 0 : (newQuotation?.breakdown?.seguro || 0),
+            total_price: finalPrice,
             includes_iva: false,
             status: 'confirmed',
-            source: 'recotizacion',
+            source: useManualPrice ? 'manual' : 'recotizacion',
+            notes: useManualPrice ? 'Precio ingresado manualmente' : null,
           })
           .select('id')
           .single();
@@ -433,21 +440,48 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
 
         {/* Cotización */}
         <div className="p-3 bg-neutral-50 border border-neutral-200 rounded">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <label className="text-xs font-medium text-neutral-500 uppercase">Cotización</label>
-            <button
-              type="button"
-              onClick={handleRecotizar}
-              disabled={isQuoting}
-              className="h-7 px-3 text-xs bg-orange-500 hover:bg-orange-600 text-white rounded flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {isQuoting ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <Calculator className="w-3 h-3" />
+            <div className="flex items-center gap-2">
+              {/* Toggle Manual/Automático */}
+              <div className="flex items-center gap-1 text-xs text-neutral-500">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUseManualPrice(false);
+                    setManualPrice('');
+                  }}
+                  className={`px-2 py-1 rounded ${!useManualPrice ? 'bg-neutral-200 text-neutral-700 font-medium' : 'hover:bg-neutral-100'}`}
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUseManualPrice(true);
+                    setNewQuotation(null);
+                  }}
+                  className={`px-2 py-1 rounded ${useManualPrice ? 'bg-orange-100 text-orange-700 font-medium' : 'hover:bg-neutral-100'}`}
+                >
+                  Manual
+                </button>
+              </div>
+              {!useManualPrice && (
+                <button
+                  type="button"
+                  onClick={handleRecotizar}
+                  disabled={isQuoting}
+                  className="h-7 px-3 text-xs bg-orange-500 hover:bg-orange-600 text-white rounded flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isQuoting ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Calculator className="w-3 h-3" />
+                  )}
+                  {isQuoting ? 'Calculando...' : 'Recotizar'}
+                </button>
               )}
-              {isQuoting ? 'Calculando...' : 'Recotizar'}
-            </button>
+            </div>
           </div>
           
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -462,7 +496,28 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                 </p>
               )}
             </div>
-            {newQuotation && (
+            
+            {/* Precio manual */}
+            {useManualPrice ? (
+              <div className="bg-orange-50 border border-orange-200 rounded p-2">
+                <label className="text-orange-700 text-xs block mb-1">Precio manual:</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-orange-400 text-sm">$</span>
+                  <input
+                    type="number"
+                    value={manualPrice}
+                    onChange={(e) => setManualPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full h-8 pl-6 pr-2 text-sm font-bold text-orange-800 border border-orange-300 rounded focus:border-orange-500 focus:ring-0 bg-white"
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+                {manualPrice && parseFloat(manualPrice) > 0 && (
+                  <p className="text-xs text-orange-600 mt-1">Se guardará al confirmar</p>
+                )}
+              </div>
+            ) : newQuotation ? (
               <div className="bg-green-50 border border-green-200 rounded p-2">
                 <span className="text-green-700 text-xs">Nuevo precio:</span>
                 <p className="font-bold text-green-800">
@@ -470,7 +525,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                 </p>
                 <p className="text-xs text-green-600">Se guardará al confirmar</p>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
