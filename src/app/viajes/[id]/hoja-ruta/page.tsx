@@ -19,22 +19,33 @@ async function getHojaRutaData(tripId: number) {
     return null;
   }
 
-  // Obtener shipments del viaje
-  const { data: shipments } = await supabaseAdmin!
-    .schema("mercure")
-    .from("shipments")
-    .select(`
-      id,
-      delivery_note_number,
-      package_quantity,
-      weight_kg,
-      declared_value,
-      paid_by,
-      sender:entities!shipments_sender_id_fkey(id, legal_name, address),
-      recipient:entities!shipments_recipient_id_fkey(id, legal_name, address)
-    `)
-    .eq("trip_id", tripId)
-    .order("created_at", { ascending: true });
+  // Obtener shipments y guías del viaje
+  const [shipmentsRes, guidesRes] = await Promise.all([
+    supabaseAdmin!
+      .schema("mercure")
+      .from("shipments")
+      .select(`
+        id,
+        delivery_note_number,
+        package_quantity,
+        weight_kg,
+        declared_value,
+        paid_by,
+        sender:entities!shipments_sender_id_fkey(id, legal_name, address),
+        recipient:entities!shipments_recipient_id_fkey(id, legal_name, address)
+      `)
+      .eq("trip_id", tripId)
+      .order("created_at", { ascending: true }),
+    supabaseAdmin!
+      .schema("mercure")
+      .from("trip_guides")
+      .select("*")
+      .eq("trip_id", tripId)
+      .order("created_at", { ascending: true }),
+  ]);
+  
+  const shipments = shipmentsRes.data;
+  const guides = guidesRes.data || [];
 
   // Formatear datos para el documento
   const remitos = (shipments || []).map((s: any) => {
@@ -74,6 +85,12 @@ async function getHojaRutaData(tripId: number) {
           phone: trip.driver_phone || undefined,
         }
       : null,
+    guides: guides.map((g: any) => ({
+      name: g.guide_name,
+      dni: g.guide_dni,
+      phone: g.guide_phone,
+      role: g.role,
+    })),
     remitos,
     notes: trip.notes,
   };

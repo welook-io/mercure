@@ -33,6 +33,10 @@ export default function NuevoVehiculoPage() {
     trailer_license_plate: "",
     pallet_capacity: "",
     weight_capacity_kg: "",
+    capacity_m3: "",
+    has_forklift: false,
+    has_hydraulic_ramp: false,
+    has_thermal_control: false,
     purchase_date: "",
     purchase_km: "",
     purchase_condition: "used",
@@ -59,6 +63,10 @@ export default function NuevoVehiculoPage() {
           trailer_license_plate: formData.trailer_license_plate.toUpperCase() || undefined,
           pallet_capacity: formData.pallet_capacity ? parseInt(formData.pallet_capacity) : undefined,
           weight_capacity_kg: formData.weight_capacity_kg ? parseFloat(formData.weight_capacity_kg) : undefined,
+          capacity_m3: formData.capacity_m3 ? parseFloat(formData.capacity_m3) : undefined,
+          has_forklift: formData.has_forklift,
+          has_hydraulic_ramp: formData.has_hydraulic_ramp,
+          has_thermal_control: formData.has_thermal_control,
           purchase_date: formData.purchase_date || undefined,
           purchase_km: formData.purchase_km ? parseInt(formData.purchase_km) : undefined,
           purchase_condition: formData.purchase_condition,
@@ -148,7 +156,7 @@ export default function NuevoVehiculoPage() {
             </div>
             <div className="space-y-4">
               <h2 className="text-xs uppercase tracking-wide text-neutral-500 font-medium">Capacidad</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-neutral-700 mb-1">Pallets</label>
                   <Input type="number" value={formData.pallet_capacity} onChange={(e) => setFormData({ ...formData, pallet_capacity: e.target.value })} className="h-8 text-sm" />
@@ -157,6 +165,27 @@ export default function NuevoVehiculoPage() {
                   <label className="block text-xs font-medium text-neutral-700 mb-1">Peso Máx (kg)</label>
                   <Input type="number" value={formData.weight_capacity_kg} onChange={(e) => setFormData({ ...formData, weight_capacity_kg: e.target.value })} className="h-8 text-sm" />
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-700 mb-1">Capacidad (m³)</label>
+                  <Input type="number" step="0.1" value={formData.capacity_m3} onChange={(e) => setFormData({ ...formData, capacity_m3: e.target.value })} className="h-8 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <h2 className="text-xs uppercase tracking-wide text-neutral-500 font-medium">Equipamiento</h2>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.has_forklift} onChange={(e) => setFormData({ ...formData, has_forklift: e.target.checked })} className="rounded border-neutral-300" />
+                  <span className="text-sm">Autoelevador</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.has_hydraulic_ramp} onChange={(e) => setFormData({ ...formData, has_hydraulic_ramp: e.target.checked })} className="rounded border-neutral-300" />
+                  <span className="text-sm">Pala Hidráulica</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.has_thermal_control} onChange={(e) => setFormData({ ...formData, has_thermal_control: e.target.checked })} className="rounded border-neutral-300" />
+                  <span className="text-sm">Control Térmico</span>
+                </label>
               </div>
             </div>
             <div className="space-y-4">

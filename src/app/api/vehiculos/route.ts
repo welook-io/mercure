@@ -11,6 +11,10 @@ interface CreateVehicleRequest {
   trailer_license_plate?: string;
   pallet_capacity?: number;
   weight_capacity_kg?: number;
+  capacity_m3?: number;
+  has_forklift?: boolean;
+  has_hydraulic_ramp?: boolean;
+  has_thermal_control?: boolean;
   purchase_date?: string;
   purchase_km?: number;
   purchase_condition?: string;
@@ -43,7 +47,11 @@ export async function POST(request: NextRequest) {
         tractor_license_plate: body.tractor_license_plate?.toUpperCase() || body.identifier.toUpperCase(),
         trailer_license_plate: body.trailer_license_plate?.toUpperCase() || null,
         pallet_capacity: body.pallet_capacity || null,
-        weight_capacity_kg: body.weight_capacity_kg || null,
+        max_weight_kg: body.weight_capacity_kg || null,
+        capacity_m3: body.capacity_m3 || null,
+        has_forklift: body.has_forklift || false,
+        has_hydraulic_ramp: body.has_hydraulic_ramp || false,
+        has_thermal_control: body.has_thermal_control || false,
         purchase_date: body.purchase_date || null,
         purchase_km: body.purchase_km || null,
         purchase_condition: body.purchase_condition || 'used',

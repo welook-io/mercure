@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, ArrowLeft, Truck, Package, X, FileText, User, Printer } from "lucide-react";
+import { Loader2, Plus, ArrowLeft, Truck, Package, X, FileText, User, Printer, Users, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { TRIP_STATUS_LABELS } from "@/lib/types";
 
@@ -44,6 +44,14 @@ interface Entity {
   tax_id: string | null;
 }
 
+interface Guide {
+  id: number;
+  guide_name: string;
+  guide_dni: string | null;
+  guide_phone: string | null;
+  role: string;
+}
+
 function getStatusVariant(status: string): "default" | "success" | "warning" | "error" | "info" {
   switch (status) {
     case 'completed': case 'arrived': case 'entregado': case 'rendida': return 'success';
@@ -65,17 +73,48 @@ function formatCurrency(value: number): string {
 export function TripDetailClient({ 
   trip, 
   shipments: initialShipments, 
-  entities 
+  entities,
+  initialGuides = []
 }: { 
   trip: Trip; 
   shipments: Shipment[]; 
   entities: Entity[];
+  initialGuides?: Guide[];
 }) {
   const router = useRouter();
   const [shipments, setShipments] = useState(initialShipments);
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Guías
+  const [guides, setGuides] = useState<Guide[]>(initialGuides);
+  const [showAddGuide, setShowAddGuide] = useState(false);
+  const [guideForm, setGuideForm] = useState({
+    guide_name: '',
+    guide_dni: '',
+    guide_phone: '',
+    role: 'acompanante',
+  });
+  const [savingGuide, setSavingGuide] = useState(false);
+
+  // Cargar guías al montar
+  useEffect(() => {
+    async function loadGuides() {
+      try {
+        const response = await fetch(`/api/viajes/${trip.id}/guides`);
+        const data = await response.json();
+        if (data.guides) {
+          setGuides(data.guides);
+        }
+      } catch (err) {
+        console.error('Error loading guides:', err);
+      }
+    }
+    if (initialGuides.length === 0) {
+      loadGuides();
+    }
+  }, [trip.id, initialGuides.length]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -90,6 +129,41 @@ export function TripDetailClient({
     origin: trip.origin,
     destination: trip.destination,
   });
+
+  const handleAddGuide = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingGuide(true);
+    try {
+      const response = await fetch(`/api/viajes/${trip.id}/guides`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(guideForm),
+      });
+      const result = await response.json();
+      if (response.ok && result.guide) {
+        setGuides(prev => [...prev, result.guide]);
+        setGuideForm({ guide_name: '', guide_dni: '', guide_phone: '', role: 'acompanante' });
+        setShowAddGuide(false);
+      } else {
+        setError(result.error || 'Error al agregar guía');
+      }
+    } catch (err) {
+      setError('Error al agregar guía');
+    } finally {
+      setSavingGuide(false);
+    }
+  };
+
+  const handleDeleteGuide = async (guideId: number) => {
+    try {
+      await fetch(`/api/viajes/${trip.id}/guides?guideId=${guideId}`, {
+        method: 'DELETE',
+      });
+      setGuides(prev => prev.filter(g => g.id !== guideId));
+    } catch (err) {
+      console.error('Error deleting guide:', err);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -244,6 +318,133 @@ export function TripDetailClient({
             <span className="text-sm font-medium">{shipments.length}</span>
           </div>
         </div>
+      </div>
+
+      {/* Guías / Acompañantes */}
+      <div className="border border-neutral-200 rounded overflow-hidden mb-6">
+        <div className="bg-neutral-50 px-4 py-2 border-b border-neutral-200 flex items-center justify-between">
+          <span className="text-sm font-medium text-neutral-700 flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Guías y Acompañantes ({guides.length})
+          </span>
+          <button
+            onClick={() => setShowAddGuide(!showAddGuide)}
+            className="text-xs text-orange-500 hover:text-orange-600 flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" />
+            Agregar Guía
+          </button>
+        </div>
+        
+        {/* Formulario agregar guía */}
+        {showAddGuide && (
+          <div className="p-3 bg-orange-50 border-b border-orange-200">
+            <form onSubmit={handleAddGuide} className="grid grid-cols-5 gap-3">
+              <div>
+                <label className="block text-xs text-neutral-500 mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  value={guideForm.guide_name}
+                  onChange={(e) => setGuideForm(prev => ({ ...prev, guide_name: e.target.value }))}
+                  placeholder="Nombre completo"
+                  className="w-full h-8 px-2 text-sm border border-neutral-200 rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-500 mb-1">DNI</label>
+                <input
+                  type="text"
+                  value={guideForm.guide_dni}
+                  onChange={(e) => setGuideForm(prev => ({ ...prev, guide_dni: e.target.value }))}
+                  placeholder="12.345.678"
+                  className="w-full h-8 px-2 text-sm border border-neutral-200 rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-500 mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={guideForm.guide_phone}
+                  onChange={(e) => setGuideForm(prev => ({ ...prev, guide_phone: e.target.value }))}
+                  placeholder="011-1234-5678"
+                  className="w-full h-8 px-2 text-sm border border-neutral-200 rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-500 mb-1">Rol</label>
+                <select
+                  value={guideForm.role}
+                  onChange={(e) => setGuideForm(prev => ({ ...prev, role: e.target.value }))}
+                  className="w-full h-8 px-2 text-sm border border-neutral-200 rounded"
+                >
+                  <option value="conductor">Conductor</option>
+                  <option value="acompanante">Acompañante</option>
+                  <option value="auxiliar">Auxiliar</option>
+                </select>
+              </div>
+              <div className="flex items-end gap-2">
+                <button
+                  type="submit"
+                  disabled={savingGuide}
+                  className="h-8 px-3 text-xs bg-orange-500 hover:bg-orange-600 text-white rounded flex items-center gap-1"
+                >
+                  {savingGuide ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                  Agregar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddGuide(false)}
+                  className="h-8 px-3 text-xs border border-neutral-200 hover:bg-neutral-100 rounded"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+        
+        {/* Lista de guías */}
+        {guides.length === 0 ? (
+          <div className="px-4 py-3 text-sm text-neutral-400 text-center">
+            No hay guías asignados a este viaje
+          </div>
+        ) : (
+          <div className="divide-y divide-neutral-100">
+            {guides.map((guide) => (
+              <div key={guide.id} className="px-4 py-2 flex items-center justify-between hover:bg-neutral-50">
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-neutral-400" />
+                  <div>
+                    <span className="text-sm font-medium">{guide.guide_name}</span>
+                    <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                      guide.role === 'conductor' ? 'bg-orange-100 text-orange-700' : 
+                      guide.role === 'auxiliar' ? 'bg-blue-100 text-blue-700' : 
+                      'bg-neutral-100 text-neutral-600'
+                    }`}>
+                      {guide.role === 'conductor' ? 'Conductor' : guide.role === 'auxiliar' ? 'Auxiliar' : 'Acompañante'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  {guide.guide_dni && (
+                    <span className="text-xs text-neutral-500">DNI: {guide.guide_dni}</span>
+                  )}
+                  {guide.guide_phone && (
+                    <span className="text-xs text-neutral-500">{guide.guide_phone}</span>
+                  )}
+                  <button
+                    onClick={() => handleDeleteGuide(guide.id)}
+                    className="p-1 text-neutral-400 hover:text-red-500 transition-colors"
+                    title="Eliminar guía"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Add Shipment Form */}

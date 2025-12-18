@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { updateVehicle, createVehicleEvent, deleteVehicleEvent } from "./actions";
 import Link from "next/link";
-import { ArrowLeft, Truck, Save, Calendar, Gauge, Plus, Wrench, FileCheck, ShoppingCart, AlertTriangle, Trash2, X, Bell, Clock, Car } from "lucide-react";
+import { ArrowLeft, Truck, Save, Calendar, Gauge, Plus, Wrench, FileCheck, ShoppingCart, AlertTriangle, Trash2, X, Bell, Clock, Car, Upload, Image } from "lucide-react";
 
 interface Vehicle {
   id: number;
@@ -20,6 +20,12 @@ interface Vehicle {
   year: number | null;
   pallet_capacity: number | null;
   weight_capacity_kg: number | null;
+  capacity_m3: number | null;
+  max_weight_kg: number | null;
+  has_forklift: boolean;
+  has_hydraulic_ramp: boolean;
+  has_thermal_control: boolean;
+  image_url: string | null;
   current_km: number | null;
   purchase_date: string | null;
   purchase_km: number | null;
@@ -140,13 +146,49 @@ export default function VehicleDetailClient({ vehicle, initialEvents }: Props) {
     tractor_license_plate: vehicle.tractor_license_plate || "",
     trailer_license_plate: vehicle.trailer_license_plate || "",
     pallet_capacity: vehicle.pallet_capacity?.toString() || "",
-    weight_capacity_kg: vehicle.weight_capacity_kg?.toString() || "",
+    weight_capacity_kg: (vehicle.weight_capacity_kg || vehicle.max_weight_kg)?.toString() || "",
+    capacity_m3: vehicle.capacity_m3?.toString() || "",
+    has_forklift: vehicle.has_forklift || false,
+    has_hydraulic_ramp: vehicle.has_hydraulic_ramp || false,
+    has_thermal_control: vehicle.has_thermal_control || false,
     purchase_date: vehicle.purchase_date || "",
     purchase_km: vehicle.purchase_km?.toString() || "",
     purchase_condition: vehicle.purchase_condition || "used",
     is_active: vehicle.is_active,
     notes: vehicle.notes || "",
   });
+
+  const [imageUrl, setImageUrl] = useState<string | null>(vehicle.image_url);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      formDataUpload.append('vehicleId', vehicle.id.toString());
+
+      const response = await fetch('/api/vehiculos/upload-image', {
+        method: 'POST',
+        body: formDataUpload,
+      });
+
+      const result = await response.json();
+      if (response.ok && result.url) {
+        setImageUrl(result.url);
+        setSuccess('Imagen subida correctamente');
+      } else {
+        setError(result.error || 'Error al subir imagen');
+      }
+    } catch (err) {
+      setError('Error al subir imagen');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const [newEvent, setNewEvent] = useState({
     event_type: "chequeo_km",
@@ -174,6 +216,10 @@ export default function VehicleDetailClient({ vehicle, initialEvents }: Props) {
         trailer_license_plate: formData.trailer_license_plate.toUpperCase() || null,
         pallet_capacity: formData.pallet_capacity ? parseInt(formData.pallet_capacity) : null,
         weight_capacity_kg: formData.weight_capacity_kg ? parseFloat(formData.weight_capacity_kg) : null,
+        capacity_m3: formData.capacity_m3 ? parseFloat(formData.capacity_m3) : null,
+        has_forklift: formData.has_forklift,
+        has_hydraulic_ramp: formData.has_hydraulic_ramp,
+        has_thermal_control: formData.has_thermal_control,
         current_km: null,
         purchase_date: formData.purchase_date || null,
         purchase_km: formData.purchase_km ? parseInt(formData.purchase_km) : null,
@@ -347,14 +393,76 @@ export default function VehicleDetailClient({ vehicle, initialEvents }: Props) {
               {editMode ? (
                 <div className="space-y-2">
                   <div><label className="block text-xs text-neutral-600 mb-1">Pallets</label><Input type="number" value={formData.pallet_capacity} onChange={(e) => setFormData({ ...formData, pallet_capacity: e.target.value })} className="h-8 text-sm" /></div>
-                  <div><label className="block text-xs text-neutral-600 mb-1">Peso Máx</label><Input type="number" value={formData.weight_capacity_kg} onChange={(e) => setFormData({ ...formData, weight_capacity_kg: e.target.value })} className="h-8 text-sm" /></div>
+                  <div><label className="block text-xs text-neutral-600 mb-1">Peso Máx (kg)</label><Input type="number" value={formData.weight_capacity_kg} onChange={(e) => setFormData({ ...formData, weight_capacity_kg: e.target.value })} className="h-8 text-sm" /></div>
+                  <div><label className="block text-xs text-neutral-600 mb-1">Volumen (m³)</label><Input type="number" step="0.1" value={formData.capacity_m3} onChange={(e) => setFormData({ ...formData, capacity_m3: e.target.value })} className="h-8 text-sm" /></div>
                 </div>
               ) : (
                 <div className="text-sm space-y-1">
                   <div><span className="text-neutral-500">Pallets:</span><span className="ml-2 font-medium">{vehicle.pallet_capacity || '-'}</span></div>
-                  <div><span className="text-neutral-500">Peso Máx:</span><span className="ml-2 font-medium">{vehicle.weight_capacity_kg ? `${Number(vehicle.weight_capacity_kg).toLocaleString('es-AR')} kg` : '-'}</span></div>
+                  <div><span className="text-neutral-500">Peso Máx:</span><span className="ml-2 font-medium">{(vehicle.weight_capacity_kg || vehicle.max_weight_kg) ? `${Number(vehicle.weight_capacity_kg || vehicle.max_weight_kg).toLocaleString('es-AR')} kg` : '-'}</span></div>
+                  <div><span className="text-neutral-500">Volumen:</span><span className="ml-2 font-medium">{vehicle.capacity_m3 ? `${Number(vehicle.capacity_m3).toLocaleString('es-AR')} m³` : '-'}</span></div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Equipamiento */}
+          <div className="border border-neutral-200 rounded p-3">
+            <h2 className="text-xs uppercase tracking-wide text-neutral-500 font-medium mb-2">Equipamiento</h2>
+            {editMode ? (
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.has_forklift} onChange={(e) => setFormData({ ...formData, has_forklift: e.target.checked })} className="rounded border-neutral-300" />
+                  <span className="text-sm">Autoelevador</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.has_hydraulic_ramp} onChange={(e) => setFormData({ ...formData, has_hydraulic_ramp: e.target.checked })} className="rounded border-neutral-300" />
+                  <span className="text-sm">Pala Hidráulica</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.has_thermal_control} onChange={(e) => setFormData({ ...formData, has_thermal_control: e.target.checked })} className="rounded border-neutral-300" />
+                  <span className="text-sm">Control Térmico</span>
+                </label>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {vehicle.has_forklift && <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded">Autoelevador</span>}
+                {vehicle.has_hydraulic_ramp && <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded">Pala Hidráulica</span>}
+                {vehicle.has_thermal_control && <span className="text-xs px-2 py-1 bg-cyan-50 text-cyan-700 rounded">Control Térmico</span>}
+                {!vehicle.has_forklift && !vehicle.has_hydraulic_ramp && !vehicle.has_thermal_control && (
+                  <span className="text-xs text-neutral-400">Sin equipamiento especial</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Imagen del Vehículo */}
+          <div className="border border-neutral-200 rounded p-3">
+            <h2 className="text-xs uppercase tracking-wide text-neutral-500 font-medium mb-2">Imagen del Vehículo</h2>
+            <div className="flex items-start gap-4">
+              {imageUrl ? (
+                <div className="relative w-32 h-24 bg-neutral-100 rounded overflow-hidden">
+                  <img src={imageUrl} alt={vehicle.identifier} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-32 h-24 bg-neutral-100 rounded flex items-center justify-center">
+                  <Image className="w-8 h-8 text-neutral-300" />
+                </div>
+              )}
+              <div>
+                <label className="cursor-pointer inline-flex items-center gap-2 h-8 px-3 text-sm border border-neutral-200 hover:bg-neutral-50 rounded">
+                  <Upload className="w-4 h-4" />
+                  {uploadingImage ? 'Subiendo...' : 'Subir Imagen'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
+                </label>
+                <p className="text-xs text-neutral-400 mt-2">JPG, PNG hasta 5MB</p>
+              </div>
             </div>
           </div>
         </div>

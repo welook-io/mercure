@@ -14,6 +14,13 @@ interface RemitoResumen {
   paid_by?: string;
 }
 
+interface Guide {
+  name: string;
+  dni?: string | null;
+  phone?: string | null;
+  role: string;
+}
+
 interface GuiaData {
   id: number;
   guia_number: string;
@@ -29,6 +36,7 @@ interface GuiaData {
     dni?: string;
     phone?: string;
   } | null;
+  guides?: Guide[];
   remitos: RemitoResumen[];
   notes?: string | null;
 }
@@ -162,6 +170,38 @@ export function GuiaDocument({ guia }: GuiaDocumentProps) {
           </div>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════
+          GUÍAS Y ACOMPAÑANTES - Solo si hay
+      ══════════════════════════════════════════════════════════════ */}
+      {guia.guides && guia.guides.length > 0 && (
+        <div className="border border-neutral-200 rounded-lg overflow-hidden mb-4">
+          <div className="bg-neutral-100 px-3 py-1.5 border-b border-neutral-200">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-neutral-600">Guías y Acompañantes</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 p-2.5">
+            {guia.guides.map((guide, idx) => (
+              <div key={idx} className="flex items-center gap-2 bg-neutral-50 rounded px-2 py-1.5">
+                <span className={`text-[8px] px-1 py-0.5 rounded font-bold ${
+                  guide.role === 'conductor' ? 'bg-orange-100 text-orange-700' : 
+                  guide.role === 'auxiliar' ? 'bg-blue-100 text-blue-700' : 
+                  'bg-neutral-200 text-neutral-600'
+                }`}>
+                  {guide.role === 'conductor' ? 'C' : guide.role === 'auxiliar' ? 'A' : 'G'}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-medium truncate">{guide.name}</p>
+                  <p className="text-[8px] text-neutral-500">
+                    {guide.dni && `DNI: ${guide.dni}`}
+                    {guide.dni && guide.phone && ' · '}
+                    {guide.phone}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════
           MÉTRICAS TOTALES - Compacto

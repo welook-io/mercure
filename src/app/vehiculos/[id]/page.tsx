@@ -15,6 +15,12 @@ interface Vehicle {
   year: number | null;
   pallet_capacity: number | null;
   weight_capacity_kg: number | null;
+  capacity_m3: number | null;
+  max_weight_kg: number | null;
+  has_forklift: boolean;
+  has_hydraulic_ramp: boolean;
+  has_thermal_control: boolean;
+  image_url: string | null;
   current_km: number | null;
   purchase_date: string | null;
   purchase_km: number | null;

@@ -18,6 +18,13 @@ interface RemitoResumen {
   paid_by?: string;
 }
 
+interface Guide {
+  name: string;
+  dni?: string | null;
+  phone?: string | null;
+  role: string;
+}
+
 interface HojaRutaData {
   id: number;
   guia_number: string;
@@ -33,6 +40,7 @@ interface HojaRutaData {
     dni?: string;
     phone?: string;
   } | null;
+  guides?: Guide[];
   remitos: RemitoResumen[];
   notes?: string | null;
 }

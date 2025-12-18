@@ -12,6 +12,10 @@ export async function updateVehicle(id: number, data: {
   trailer_license_plate: string | null;
   pallet_capacity: number | null;
   weight_capacity_kg: number | null;
+  capacity_m3?: number | null;
+  has_forklift?: boolean;
+  has_hydraulic_ramp?: boolean;
+  has_thermal_control?: boolean;
   current_km: number | null;
   purchase_date: string | null;
   purchase_km: number | null;
@@ -21,13 +25,34 @@ export async function updateVehicle(id: number, data: {
 }) {
   if (!supabaseAdmin) throw new Error("No admin client");
   
+  // Map weight_capacity_kg to max_weight_kg for DB
+  const dbData = {
+    identifier: data.identifier,
+    brand: data.brand,
+    model: data.model,
+    vehicle_type: data.vehicle_type,
+    year: data.year,
+    tractor_license_plate: data.tractor_license_plate,
+    trailer_license_plate: data.trailer_license_plate,
+    pallet_capacity: data.pallet_capacity,
+    max_weight_kg: data.weight_capacity_kg,
+    capacity_m3: data.capacity_m3,
+    has_forklift: data.has_forklift,
+    has_hydraulic_ramp: data.has_hydraulic_ramp,
+    has_thermal_control: data.has_thermal_control,
+    current_km: data.current_km,
+    purchase_date: data.purchase_date,
+    purchase_km: data.purchase_km,
+    purchase_condition: data.purchase_condition,
+    is_active: data.is_active,
+    notes: data.notes,
+    updated_at: new Date().toISOString()
+  };
+  
   const { error } = await supabaseAdmin
     .schema('mercure')
     .from('vehicles')
-    .update({
-      ...data,
-      updated_at: new Date().toISOString()
-    })
+    .update(dbData)
     .eq('id', id);
   
   if (error) throw error;
