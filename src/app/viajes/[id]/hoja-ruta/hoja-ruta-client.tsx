@@ -18,13 +18,6 @@ interface RemitoResumen {
   paid_by?: string;
 }
 
-interface Guide {
-  name: string;
-  dni?: string | null;
-  phone?: string | null;
-  role: string;
-}
-
 interface HojaRutaData {
   id: number;
   guia_number: string;
@@ -40,7 +33,6 @@ interface HojaRutaData {
     dni?: string;
     phone?: string;
   } | null;
-  guides?: Guide[];
   remitos: RemitoResumen[];
   notes?: string | null;
 }
@@ -69,7 +61,7 @@ export function HojaRutaClient({ hojaRuta, tripId }: { hojaRuta: HojaRutaData; t
               Hoja de Ruta - {hojaRuta.guia_number}
             </h1>
             <p className="text-xs text-neutral-500">
-              {hojaRuta.origin} → {hojaRuta.destination} · {hojaRuta.remitos.length} remitos
+              {hojaRuta.origin} → {hojaRuta.destination} · {hojaRuta.remitos.length} guías
             </p>
           </div>
         </div>

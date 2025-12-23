@@ -35,7 +35,6 @@ interface Shipment {
 
 interface KanbanColumns {
   recepcion: Shipment[];
-  enViaje: Shipment[];
   enDestino: Shipment[];
   entregado: Shipment[];
 }
@@ -94,36 +93,29 @@ const COLUMN_CONFIG = [
     lightBg: 'bg-blue-50',
     borderColor: 'border-blue-200',
     docs: ['Remito sellado', 'Guía'],
-  },
-  {
-    key: 'enViaje' as const,
-    title: 'En Viaje',
-    subtitle: 'En tránsito',
-    icon: Truck,
-    color: 'bg-orange-500',
-    lightBg: 'bg-orange-50',
-    borderColor: 'border-orange-200',
-    docs: ['Remito', 'Guía', 'Hoja de Ruta'],
+    action: { href: '/viajes/nuevo?tipo=viaje', label: 'Crear Viaje' },
   },
   {
     key: 'enDestino' as const,
     title: 'En Destino',
-    subtitle: 'Listo para entregar',
+    subtitle: 'Llegó, listo para última milla',
     icon: MapPin,
     color: 'bg-purple-500',
     lightBg: 'bg-purple-50',
     borderColor: 'border-purple-200',
     docs: ['Remito', 'Guía', 'Hoja de Ruta firmada'],
+    action: { href: '/viajes/nuevo?tipo=ultima_milla', label: 'Crear Última Milla' },
   },
   {
     key: 'entregado' as const,
     title: 'Entregado',
-    subtitle: 'Ciclo cerrado',
+    subtitle: 'Entregado al cliente final',
     icon: CheckCircle2,
     color: 'bg-green-500',
     lightBg: 'bg-green-50',
     borderColor: 'border-green-200',
     docs: ['Remito', 'Guía firmada'],
+    action: null,
   },
 ];
 
@@ -209,7 +201,7 @@ function ShipmentCard({ shipment, showTrip = false }: { shipment: Shipment; show
 
 export function KanbanBoard({ columns }: KanbanBoardProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {COLUMN_CONFIG.map((config) => {
         const Icon = config.icon;
         const items = columns[config.key];
@@ -248,6 +240,16 @@ export function KanbanBoard({ columns }: KanbanBoardProps) {
                   );
                 })}
               </div>
+
+              {/* Action button */}
+              {config.action && items.length > 0 && (
+                <Link 
+                  href={config.action.href}
+                  className={`mt-2 block w-full text-center text-xs py-1.5 rounded ${config.color} text-white hover:opacity-90 transition-opacity`}
+                >
+                  {config.action.label}
+                </Link>
+              )}
             </div>
 
             {/* Column Content */}
@@ -262,7 +264,7 @@ export function KanbanBoard({ columns }: KanbanBoardProps) {
                     <ShipmentCard 
                       key={shipment.id} 
                       shipment={shipment} 
-                      showTrip={config.key === 'enViaje'}
+                      showTrip={config.key === 'enDestino'}
                     />
                   ))}
                   {items.length > 20 && (

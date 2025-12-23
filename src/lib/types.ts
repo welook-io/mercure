@@ -167,6 +167,12 @@ export const TRIP_STATUS_LABELS: Record<Trip['status'], string> = {
   cancelled: 'Cancelado',
 };
 
+export const TRIP_TYPE_LABELS: Record<string, string> = {
+  consolidado: 'Viaje',
+  camion_completo: 'Camión Completo',
+  ultima_milla: 'Última Milla',
+};
+
 export const ENTITY_TYPE_LABELS: Record<string, string> = {
   cliente: 'Cliente',
   proveedor: 'Proveedor',

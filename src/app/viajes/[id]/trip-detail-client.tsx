@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, ArrowLeft, Truck, Package, X, FileText, User, Printer, Users, Trash2 } from "lucide-react";
+import { Loader2, Plus, ArrowLeft, Truck, Package, X, FileText, Printer, Send, MapPin, Search, Check } from "lucide-react";
 import Link from "next/link";
 import { TRIP_STATUS_LABELS } from "@/lib/types";
 
@@ -12,6 +12,7 @@ interface Trip {
   origin: string;
   destination: string;
   status: string;
+  trip_type: string;
   departure_time: string | null;
   arrival_time: string | null;
   notes: string | null;
@@ -44,14 +45,6 @@ interface Entity {
   tax_id: string | null;
 }
 
-interface Guide {
-  id: number;
-  guide_name: string;
-  guide_dni: string | null;
-  guide_phone: string | null;
-  role: string;
-}
-
 function getStatusVariant(status: string): "default" | "success" | "warning" | "error" | "info" {
   switch (status) {
     case 'completed': case 'arrived': case 'entregado': case 'rendida': return 'success';
@@ -73,13 +66,11 @@ function formatCurrency(value: number): string {
 export function TripDetailClient({ 
   trip, 
   shipments: initialShipments, 
-  entities,
-  initialGuides = []
+  entities
 }: { 
   trip: Trip; 
   shipments: Shipment[]; 
   entities: Entity[];
-  initialGuides?: Guide[];
 }) {
   const router = useRouter();
   const [shipments, setShipments] = useState(initialShipments);
@@ -87,34 +78,90 @@ export function TripDetailClient({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Guías
-  const [guides, setGuides] = useState<Guide[]>(initialGuides);
-  const [showAddGuide, setShowAddGuide] = useState(false);
-  const [guideForm, setGuideForm] = useState({
-    guide_name: '',
-    guide_dni: '',
-    guide_phone: '',
-    role: 'acompanante',
-  });
-  const [savingGuide, setSavingGuide] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
 
-  // Cargar guías al montar
-  useEffect(() => {
-    async function loadGuides() {
-      try {
-        const response = await fetch(`/api/viajes/${trip.id}/guides`);
-        const data = await response.json();
-        if (data.guides) {
-          setGuides(data.guides);
-        }
-      } catch (err) {
-        console.error('Error loading guides:', err);
+  // Asignar guías existentes
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [availableShipments, setAvailableShipments] = useState<Array<{
+    id: number;
+    delivery_note_number: string;
+    sender_name: string | null;
+    recipient_name: string | null;
+    weight_kg: number | null;
+    declared_value: number | null;
+  }>>([]);
+  const [selectedShipmentIds, setSelectedShipmentIds] = useState<number[]>([]);
+  const [loadingAvailable, setLoadingAvailable] = useState(false);
+  const [assigningShipments, setAssigningShipments] = useState(false);
+
+  // Cargar guías disponibles
+  const loadAvailableShipments = async () => {
+    setLoadingAvailable(true);
+    try {
+      const response = await fetch(`/api/viajes/${trip.id}/assign-shipments`);
+      const data = await response.json();
+      if (data.shipments) {
+        setAvailableShipments(data.shipments);
       }
+    } catch (err) {
+      console.error('Error loading available shipments:', err);
+    } finally {
+      setLoadingAvailable(false);
     }
-    if (initialGuides.length === 0) {
-      loadGuides();
+  };
+
+  const handleOpenAssignModal = () => {
+    setShowAssignModal(true);
+    setSelectedShipmentIds([]);
+    loadAvailableShipments();
+  };
+
+  const toggleShipmentSelection = (id: number) => {
+    setSelectedShipmentIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(x => x !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleAssignShipments = async () => {
+    if (selectedShipmentIds.length === 0) return;
+    
+    setAssigningShipments(true);
+    try {
+      const response = await fetch(`/api/viajes/${trip.id}/assign-shipments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipmentIds: selectedShipmentIds }),
+      });
+      
+      if (response.ok) {
+        setShowAssignModal(false);
+        router.refresh();
+        window.location.reload();
+      } else {
+        const result = await response.json();
+        setError(result.error || 'Error al asignar');
+      }
+    } catch (err) {
+      setError('Error al asignar guías');
+    } finally {
+      setAssigningShipments(false);
     }
-  }, [trip.id, initialGuides.length]);
+  };
+
+  const handleRemoveShipment = async (shipmentId: number) => {
+    if (!confirm('¿Quitar este remito del viaje?')) return;
+    
+    try {
+      await fetch(`/api/viajes/${trip.id}/assign-shipments?shipmentId=${shipmentId}`, {
+        method: 'DELETE',
+      });
+      setShipments(prev => prev.filter(s => s.id !== shipmentId));
+    } catch (err) {
+      console.error('Error removing shipment:', err);
+    }
+  };
 
   // Form state
   const [formData, setFormData] = useState({
@@ -129,41 +176,6 @@ export function TripDetailClient({
     origin: trip.origin,
     destination: trip.destination,
   });
-
-  const handleAddGuide = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingGuide(true);
-    try {
-      const response = await fetch(`/api/viajes/${trip.id}/guides`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(guideForm),
-      });
-      const result = await response.json();
-      if (response.ok && result.guide) {
-        setGuides(prev => [...prev, result.guide]);
-        setGuideForm({ guide_name: '', guide_dni: '', guide_phone: '', role: 'acompanante' });
-        setShowAddGuide(false);
-      } else {
-        setError(result.error || 'Error al agregar guía');
-      }
-    } catch (err) {
-      setError('Error al agregar guía');
-    } finally {
-      setSavingGuide(false);
-    }
-  };
-
-  const handleDeleteGuide = async (guideId: number) => {
-    try {
-      await fetch(`/api/viajes/${trip.id}/guides?guideId=${guideId}`, {
-        method: 'DELETE',
-      });
-      setGuides(prev => prev.filter(g => g.id !== guideId));
-    } catch (err) {
-      console.error('Error deleting guide:', err);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -223,6 +235,37 @@ export function TripDetailClient({
     window.open(`/viajes/${trip.id}/hoja-ruta`, '_blank');
   };
 
+  const handleDispatch = async () => {
+    if (!confirm(`¿Despachar el viaje #${trip.id} con ${shipments.length} guías? Las guías pasarán a "En Destino".`)) {
+      return;
+    }
+    
+    setDispatching(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/dispatch-trip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tripId: trip.id, directToDestination: true }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al despachar');
+      }
+      
+      // Reload page to reflect changes
+      router.refresh();
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al despachar');
+    } finally {
+      setDispatching(false);
+    }
+  };
+
   const totalFlete = shipments.reduce((sum, s) => sum + (s.freight_cost || 0), 0);
   const totalSeguro = shipments.reduce((sum, s) => sum + (s.insurance_cost || 0), 0);
 
@@ -257,13 +300,48 @@ export function TripDetailClient({
             <Printer className="w-4 h-4" />
             Hoja de Ruta
           </button>
+          {['planned', 'loading'].includes(trip.status) && (
+            <button
+              onClick={handleOpenAssignModal}
+              className="h-8 px-3 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded flex items-center gap-2"
+            >
+              <Package className="w-4 h-4" />
+              Asignar Guías
+            </button>
+          )}
           <button
             onClick={() => setShowAddForm(true)}
-            className="h-8 px-3 text-sm bg-orange-500 hover:bg-orange-600 text-white rounded flex items-center gap-2"
+            className="h-8 px-3 text-sm border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Agregar Remito
+            Crear Nuevo
           </button>
+          {['planned', 'loading'].includes(trip.status) && shipments.length > 0 && (
+            <button
+              onClick={handleDispatch}
+              disabled={dispatching}
+              className={`h-8 px-3 text-sm ${trip.trip_type === 'ultima_milla' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'} disabled:bg-neutral-300 text-white rounded flex items-center gap-2`}
+            >
+              {dispatching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              {trip.trip_type === 'ultima_milla' ? 'Entregar al Cliente' : 'Despachar a Destino'}
+            </button>
+          )}
+          {trip.status === 'arrived' && (
+            <span className="h-8 px-3 text-sm bg-purple-100 text-purple-700 rounded flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              En Destino
+            </span>
+          )}
+          {trip.status === 'completed' && (
+            <span className="h-8 px-3 text-sm bg-green-100 text-green-700 rounded flex items-center gap-2">
+              <Check className="w-4 h-4" />
+              Entregado
+            </span>
+          )}
         </div>
       </div>
 
@@ -271,19 +349,30 @@ export function TripDetailClient({
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="border border-neutral-200 rounded p-3">
           <div className="text-xs text-neutral-500 uppercase mb-1">Vehículo</div>
-          <div className="flex items-center gap-2">
-            <Truck className="w-4 h-4 text-neutral-400" />
-            <span className="text-sm font-medium">
-              {trip.vehicle?.identifier || '-'}
-            </span>
-          </div>
-          <div className="text-xs text-neutral-400 mt-1">
-            {trip.vehicle?.tractor_license_plate || '-'}
-          </div>
+          {trip.vehicle?.identifier ? (
+            <>
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-neutral-400" />
+                <span className="text-sm font-medium">
+                  {trip.vehicle.identifier}
+                </span>
+              </div>
+              <div className="text-xs text-neutral-400 mt-1">
+                {trip.vehicle.tractor_license_plate || '-'}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🚛</span>
+              <span className="text-sm font-medium text-orange-600">
+                Tercerizado
+              </span>
+            </div>
+          )}
         </div>
         <div className="border border-orange-200 bg-orange-50 rounded p-3">
           <div className="text-xs text-orange-600 uppercase mb-1 flex items-center gap-1">
-            <User className="w-3 h-3" /> Conductor
+            <Truck className="w-3 h-3" /> Conductor
           </div>
           <div className="text-sm font-medium text-neutral-900">
             {trip.driver_name || '-'}
@@ -312,7 +401,7 @@ export function TripDetailClient({
           </div>
         </div>
         <div className="border border-neutral-200 rounded p-3">
-          <div className="text-xs text-neutral-500 uppercase mb-1">Remitos</div>
+          <div className="text-xs text-neutral-500 uppercase mb-1">Guías</div>
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-neutral-400" />
             <span className="text-sm font-medium">{shipments.length}</span>
@@ -320,138 +409,12 @@ export function TripDetailClient({
         </div>
       </div>
 
-      {/* Guías / Acompañantes */}
-      <div className="border border-neutral-200 rounded overflow-hidden mb-6">
-        <div className="bg-neutral-50 px-4 py-2 border-b border-neutral-200 flex items-center justify-between">
-          <span className="text-sm font-medium text-neutral-700 flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Guías y Acompañantes ({guides.length})
-          </span>
-          <button
-            onClick={() => setShowAddGuide(!showAddGuide)}
-            className="text-xs text-orange-500 hover:text-orange-600 flex items-center gap-1"
-          >
-            <Plus className="w-3 h-3" />
-            Agregar Guía
-          </button>
-        </div>
-        
-        {/* Formulario agregar guía */}
-        {showAddGuide && (
-          <div className="p-3 bg-orange-50 border-b border-orange-200">
-            <form onSubmit={handleAddGuide} className="grid grid-cols-5 gap-3">
-              <div>
-                <label className="block text-xs text-neutral-500 mb-1">Nombre *</label>
-                <input
-                  type="text"
-                  value={guideForm.guide_name}
-                  onChange={(e) => setGuideForm(prev => ({ ...prev, guide_name: e.target.value }))}
-                  placeholder="Nombre completo"
-                  className="w-full h-8 px-2 text-sm border border-neutral-200 rounded"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-neutral-500 mb-1">DNI</label>
-                <input
-                  type="text"
-                  value={guideForm.guide_dni}
-                  onChange={(e) => setGuideForm(prev => ({ ...prev, guide_dni: e.target.value }))}
-                  placeholder="12.345.678"
-                  className="w-full h-8 px-2 text-sm border border-neutral-200 rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-neutral-500 mb-1">Teléfono</label>
-                <input
-                  type="text"
-                  value={guideForm.guide_phone}
-                  onChange={(e) => setGuideForm(prev => ({ ...prev, guide_phone: e.target.value }))}
-                  placeholder="011-1234-5678"
-                  className="w-full h-8 px-2 text-sm border border-neutral-200 rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-neutral-500 mb-1">Rol</label>
-                <select
-                  value={guideForm.role}
-                  onChange={(e) => setGuideForm(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full h-8 px-2 text-sm border border-neutral-200 rounded"
-                >
-                  <option value="conductor">Conductor</option>
-                  <option value="acompanante">Acompañante</option>
-                  <option value="auxiliar">Auxiliar</option>
-                </select>
-              </div>
-              <div className="flex items-end gap-2">
-                <button
-                  type="submit"
-                  disabled={savingGuide}
-                  className="h-8 px-3 text-xs bg-orange-500 hover:bg-orange-600 text-white rounded flex items-center gap-1"
-                >
-                  {savingGuide ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                  Agregar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddGuide(false)}
-                  className="h-8 px-3 text-xs border border-neutral-200 hover:bg-neutral-100 rounded"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-        
-        {/* Lista de guías */}
-        {guides.length === 0 ? (
-          <div className="px-4 py-3 text-sm text-neutral-400 text-center">
-            No hay guías asignados a este viaje
-          </div>
-        ) : (
-          <div className="divide-y divide-neutral-100">
-            {guides.map((guide) => (
-              <div key={guide.id} className="px-4 py-2 flex items-center justify-between hover:bg-neutral-50">
-                <div className="flex items-center gap-3">
-                  <User className="w-4 h-4 text-neutral-400" />
-                  <div>
-                    <span className="text-sm font-medium">{guide.guide_name}</span>
-                    <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
-                      guide.role === 'conductor' ? 'bg-orange-100 text-orange-700' : 
-                      guide.role === 'auxiliar' ? 'bg-blue-100 text-blue-700' : 
-                      'bg-neutral-100 text-neutral-600'
-                    }`}>
-                      {guide.role === 'conductor' ? 'Conductor' : guide.role === 'auxiliar' ? 'Auxiliar' : 'Acompañante'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  {guide.guide_dni && (
-                    <span className="text-xs text-neutral-500">DNI: {guide.guide_dni}</span>
-                  )}
-                  {guide.guide_phone && (
-                    <span className="text-xs text-neutral-500">{guide.guide_phone}</span>
-                  )}
-                  <button
-                    onClick={() => handleDeleteGuide(guide.id)}
-                    className="p-1 text-neutral-400 hover:text-red-500 transition-colors"
-                    title="Eliminar guía"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Add Shipment Form */}
       {showAddForm && (
         <div className="border border-orange-200 bg-orange-50 rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-neutral-900">Nuevo Remito</h3>
+            <h3 className="font-medium text-neutral-900">Nueva Guía</h3>
             <button onClick={() => setShowAddForm(false)} className="text-neutral-400 hover:text-neutral-600">
               <X className="w-5 h-5" />
             </button>
@@ -466,7 +429,7 @@ export function TripDetailClient({
           <form onSubmit={handleAddShipment} className="grid grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                Nº Remito *
+                Nº Guía *
               </label>
               <input
                 type="text"
@@ -603,7 +566,7 @@ export function TripDetailClient({
                 ) : (
                   <>
                     <Plus className="w-4 h-4" />
-                    Agregar Remito
+                    Agregar Guía
                   </>
                 )}
               </button>
@@ -615,7 +578,7 @@ export function TripDetailClient({
       {/* Shipments Table */}
       <div className="border border-neutral-200 rounded overflow-hidden">
         <div className="bg-neutral-50 px-4 py-2 border-b border-neutral-200 flex items-center justify-between">
-          <span className="text-sm font-medium text-neutral-700">Remitos del Viaje</span>
+          <span className="text-sm font-medium text-neutral-700">Guías del Viaje</span>
           <div className="text-xs text-neutral-500">
             Total Flete: <span className="font-medium text-neutral-700">{formatCurrency(totalFlete)}</span>
             {' · '}
@@ -626,22 +589,22 @@ export function TripDetailClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-neutral-50 border-b border-neutral-200">
-                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remito</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Guía</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remitente</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Destinatario</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Peso</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Vol.</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">V. Decl.</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Flete</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Seguro</th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-neutral-500 uppercase">Estado</th>
+                {['planned', 'loading'].includes(trip.status) && (
+                  <th className="px-3 py-2 text-center text-xs font-medium text-neutral-500 uppercase w-10"></th>
+                )}
               </tr>
             </thead>
             <tbody>
               {shipments.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-neutral-400">
-                    No hay remitos cargados. Usa "Agregar Remito" para cargar remitos manualmente.
+                  <td colSpan={7} className="px-3 py-8 text-center text-neutral-400">
+                    No hay guías. Usá <strong>"Asignar Guías"</strong> para agregar guías existentes.
                   </td>
                 </tr>
               ) : (
@@ -651,18 +614,26 @@ export function TripDetailClient({
                   return (
                     <tr key={s.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
                       <td className="px-3 py-2 font-mono text-xs">{s.delivery_note_number}</td>
-                      <td className="px-3 py-2 text-neutral-700">{sender?.legal_name || '-'}</td>
-                      <td className="px-3 py-2 text-neutral-600">{recipient?.legal_name || '-'}</td>
-                      <td className="px-3 py-2 text-right text-neutral-600">{s.weight_kg ? `${s.weight_kg} kg` : '-'}</td>
-                      <td className="px-3 py-2 text-right text-neutral-600">{s.volume_m3 ? `${s.volume_m3} m³` : '-'}</td>
-                      <td className="px-3 py-2 text-right text-neutral-600">{s.declared_value ? formatCurrency(s.declared_value) : '-'}</td>
-                      <td className="px-3 py-2 text-right font-medium">{s.freight_cost ? formatCurrency(s.freight_cost) : '-'}</td>
-                      <td className="px-3 py-2 text-right text-neutral-600">{s.insurance_cost ? formatCurrency(s.insurance_cost) : '-'}</td>
+                      <td className="px-3 py-2 text-neutral-700 text-xs">{sender?.legal_name || '-'}</td>
+                      <td className="px-3 py-2 text-neutral-600 text-xs">{recipient?.legal_name || '-'}</td>
+                      <td className="px-3 py-2 text-right text-neutral-600 text-xs">{s.weight_kg ? `${s.weight_kg} kg` : '-'}</td>
+                      <td className="px-3 py-2 text-right text-neutral-600 text-xs">{s.declared_value ? formatCurrency(s.declared_value) : '-'}</td>
                       <td className="px-3 py-2 text-center">
                         <Badge variant={getStatusVariant(s.status)}>
                           {s.status}
                         </Badge>
                       </td>
+                      {['planned', 'loading'].includes(trip.status) && (
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => handleRemoveShipment(s.id)}
+                            className="p-1 text-neutral-400 hover:text-red-500 transition-colors"
+                            title="Quitar del viaje"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -671,6 +642,97 @@ export function TripDetailClient({
           </table>
         </div>
       </div>
+
+      {/* Modal Asignar Guías */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="px-4 py-3 border-b border-neutral-200 flex items-center justify-between bg-orange-50">
+              <div>
+                <h3 className="font-medium text-neutral-900">Asignar Guías al Viaje</h3>
+                <p className="text-xs text-neutral-500">Seleccioná las guías de recepción para cargar al camión</p>
+              </div>
+              <button onClick={() => setShowAssignModal(false)} className="text-neutral-400 hover:text-neutral-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto max-h-[50vh]">
+              {loadingAvailable ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
+                </div>
+              ) : availableShipments.length === 0 ? (
+                <div className="text-center py-8 text-neutral-400">
+                  No hay guías disponibles en recepción
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {availableShipments.map((s) => (
+                    <div 
+                      key={s.id}
+                      onClick={() => toggleShipmentSelection(s.id)}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedShipmentIds.includes(s.id)
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-neutral-200 hover:border-neutral-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center ${
+                            selectedShipmentIds.includes(s.id)
+                              ? 'bg-orange-500 border-orange-500 text-white'
+                              : 'border-neutral-300'
+                          }`}>
+                            {selectedShipmentIds.includes(s.id) && <Check className="w-3 h-3" />}
+                          </div>
+                          <div>
+                            <p className="font-mono text-sm font-medium">{s.delivery_note_number}</p>
+                            <p className="text-xs text-neutral-500">
+                              {s.sender_name || 'Sin remitente'} → {s.recipient_name || 'Sin destinatario'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs text-neutral-500">
+                          {s.weight_kg && <span>{s.weight_kg} kg</span>}
+                          {s.declared_value && <span className="ml-2">${s.declared_value.toLocaleString()}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="px-4 py-3 border-t border-neutral-200 bg-neutral-50 flex items-center justify-between">
+              <span className="text-sm text-neutral-600">
+                {selectedShipmentIds.length} guía{selectedShipmentIds.length !== 1 ? 's' : ''} seleccionada{selectedShipmentIds.length !== 1 ? 's' : ''}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowAssignModal(false)}
+                  className="h-8 px-4 text-sm border border-neutral-200 hover:bg-neutral-100 rounded"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleAssignShipments}
+                  disabled={selectedShipmentIds.length === 0 || assigningShipments}
+                  className="h-8 px-4 text-sm bg-orange-500 hover:bg-orange-600 disabled:bg-neutral-300 text-white rounded flex items-center gap-2"
+                >
+                  {assigningShipments ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Package className="w-4 h-4" />
+                  )}
+                  Asignar al Viaje
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -208,7 +208,7 @@ export function GuiaDocument({ guia }: GuiaDocumentProps) {
       ══════════════════════════════════════════════════════════════ */}
       <div className="flex gap-2 mb-4">
         <div className="bg-neutral-900 text-white rounded-lg p-3 text-center w-16 shrink-0">
-          <p className="text-[9px] uppercase tracking-wider opacity-60 mb-1">Remitos</p>
+          <p className="text-[9px] uppercase tracking-wider opacity-60 mb-1">Guías</p>
           <p className="text-2xl font-black">{guia.remitos.length}</p>
         </div>
         <div className="bg-neutral-100 rounded-lg p-3 text-center flex-1 min-w-0">
@@ -228,17 +228,17 @@ export function GuiaDocument({ guia }: GuiaDocumentProps) {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════
-          TABLA DE REMITOS - Principal con alto fijo
+          TABLA DE GUÍAS - Principal con alto fijo
       ══════════════════════════════════════════════════════════════ */}
       <div className="border border-neutral-200 rounded-lg overflow-hidden mb-4" style={{ minHeight: '280px' }}>
         <div className="bg-neutral-900 text-white px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider">Detalle de Remitos</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider">Detalle de Guías</p>
         </div>
         <table className="w-full text-[11px]">
           <thead>
             <tr className="bg-neutral-50 border-b border-neutral-200">
               <th className="px-2 py-2 text-left font-semibold text-neutral-500 uppercase tracking-wider text-[9px] w-6">#</th>
-              <th className="px-2 py-2 text-left font-semibold text-neutral-500 uppercase tracking-wider text-[9px]">Nº Remito</th>
+              <th className="px-2 py-2 text-left font-semibold text-neutral-500 uppercase tracking-wider text-[9px]">Nº Guía</th>
               <th className="px-2 py-2 text-left font-semibold text-neutral-500 uppercase tracking-wider text-[9px]">Remitente</th>
               <th className="px-2 py-2 text-left font-semibold text-neutral-500 uppercase tracking-wider text-[9px]">Destinatario</th>
               <th className="px-2 py-2 text-center font-semibold text-neutral-500 uppercase tracking-wider text-[9px] w-14">Bultos</th>

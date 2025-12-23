@@ -70,14 +70,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // Si es tercerizado, no asignar vehículo propio
+    const isTercerizado = body.vehicle_id === 'tercerizado_logisa';
+    
     const tripData: Record<string, unknown> = {
       trip_type: body.trip_type || "consolidado",
       origin: body.origin,
       destination: body.destination,
       status: "planned",
-      vehicle_id: body.vehicle_id ? parseInt(body.vehicle_id) : null,
+      vehicle_id: isTercerizado ? null : (body.vehicle_id ? parseInt(body.vehicle_id) : null),
       departure_time: body.departure_time || null,
-      notes: body.notes || null,
+      notes: isTercerizado 
+        ? `[Tercerizado Logisa] ${body.notes || ''}`.trim()
+        : (body.notes || null),
       // Campos para conductor/guía
       driver_name: body.driver_name || null,
       driver_dni: body.driver_dni || null,

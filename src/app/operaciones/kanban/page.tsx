@@ -109,25 +109,26 @@ export default async function KanbanPage() {
 
   const shipments = await getShipments();
 
-  // Agrupar por columnas del kanban
+  // Agrupar por columnas del kanban (3 columnas: Recepción, En Destino, Entregado)
   const columns = {
+    // Recepción: guías en depósito origen sin viaje asignado
     recepcion: shipments.filter(s => 
       ['received', 'in_warehouse', 'ingresada'].includes(s.status) && !s.trip_id
     ),
-    enViaje: shipments.filter(s => 
-      ['loaded', 'in_transit'].includes(s.status) || 
-      (s.trip_id && s.trip?.status === 'in_transit')
-    ),
+    // En Destino: guías que llegaron (viaje arrived) o están cargadas/en tránsito, listas para última milla
     enDestino: shipments.filter(s => 
-      s.trip?.status === 'arrived' && s.status !== 'delivered'
+      s.status === 'en_destino' || 
+      s.status === 'arrived' ||
+      ['loaded', 'in_transit', 'en_transito'].includes(s.status) ||
+      (s.trip?.status === 'arrived' && !['delivered', 'entregado'].includes(s.status))
     ),
-    entregado: shipments.filter(s => s.status === 'delivered'),
+    // Entregado: guías entregadas al cliente final
+    entregado: shipments.filter(s => ['delivered', 'entregado'].includes(s.status)),
   };
 
   // Totales
   const totals = {
     recepcion: columns.recepcion.length,
-    enViaje: columns.enViaje.length,
     enDestino: columns.enDestino.length,
     entregado: columns.entregado.length,
   };
@@ -146,7 +147,11 @@ export default async function KanbanPage() {
             <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                <span className="text-neutral-600">{totals.recepcion + totals.enViaje + totals.enDestino} activos</span>
+                <span className="text-neutral-600">{totals.recepcion} en recepción</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                <span className="text-neutral-600">{totals.enDestino} en destino</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>

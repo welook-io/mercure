@@ -16,7 +16,7 @@ export async function GET() {
       supabaseAdmin!
         .schema("mercure")
         .from("vehicles")
-        .select("id, identifier, tractor_license_plate, brand, model")
+        .select("id, identifier, tractor_license_plate, brand, model, image_url")
         .order("identifier"),
       
       // Usuarios con rol chofer

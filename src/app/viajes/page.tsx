@@ -1,50 +1,103 @@
 import { Navbar } from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { supabaseAdmin } from "@/lib/supabase";
-import { TRIP_STATUS_LABELS } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
 import { requireAuth } from "@/lib/auth";
 import Link from "next/link";
-import { Truck, Package } from "lucide-react";
+import { TripsListClient } from "./trips-list-client";
 
-async function getTrips() {
-  const { data } = await supabaseAdmin!
+async function getTripsWithShipments() {
+  // Obtener trips
+  const { data: trips, error } = await supabaseAdmin!
     .schema('mercure')
     .from('trips')
-    .select(`
-      *, 
-      vehicle:vehicles(identifier, tractor_license_plate),
-      client:entities!trips_client_id_fkey(legal_name),
-      supplier:entities!trips_supplier_id_fkey(legal_name)
-    `)
+    .select('id, origin, destination, status, trip_type, departure_time, vehicle_id, agreed_price, created_at')
     .order('created_at', { ascending: false })
     .limit(100);
-  return data || [];
-}
-
-function getStatusVariant(status: string): "default" | "success" | "warning" | "error" | "info" {
-  switch (status) {
-    case 'completed': case 'arrived': return 'success';
-    case 'in_transit': return 'info';
-    case 'loading': case 'planned': return 'warning';
-    case 'cancelled': return 'error';
-    default: return 'default';
+  
+  if (error) {
+    console.error('Error fetching trips:', error);
+    return [];
   }
-}
-
-function formatCurrency(value: number | null): string {
-  if (!value) return '-';
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    minimumFractionDigits: 0,
-  }).format(value);
+  
+  if (!trips || trips.length === 0) return [];
+  
+  const tripIds = trips.map(t => t.id);
+  
+  // Obtener vehículos
+  const vehicleIds = trips.map(t => t.vehicle_id).filter(Boolean);
+  let vehiclesMap: Record<number, { identifier: string; tractor_license_plate: string | null }> = {};
+  
+  if (vehicleIds.length > 0) {
+    const { data: vehicles } = await supabaseAdmin!
+      .schema('mercure')
+      .from('vehicles')
+      .select('id, identifier, tractor_license_plate')
+      .in('id', vehicleIds);
+    
+    if (vehicles) {
+      vehiclesMap = Object.fromEntries(vehicles.map(v => [v.id, v]));
+    }
+  }
+  
+  // Obtener shipments para cada trip
+  const { data: shipments } = await supabaseAdmin!
+    .schema('mercure')
+    .from('shipments')
+    .select('id, trip_id, delivery_note_number, weight_kg, volume_m3, cargo_image_url, remito_image_url')
+    .in('trip_id', tripIds);
+  
+  // Agrupar shipments por trip
+  const shipmentsMap: Record<number, Array<{
+    id: number;
+    delivery_note_number: string;
+    weight_kg: number | null;
+    volume_m3: number | null;
+    cargo_image_url: string | null;
+    remito_image_url: string | null;
+  }>> = {};
+  
+  (shipments || []).forEach(s => {
+    if (!shipmentsMap[s.trip_id]) {
+      shipmentsMap[s.trip_id] = [];
+    }
+    shipmentsMap[s.trip_id].push({
+      id: s.id,
+      delivery_note_number: s.delivery_note_number,
+      weight_kg: s.weight_kg,
+      volume_m3: s.volume_m3,
+      cargo_image_url: s.cargo_image_url,
+      remito_image_url: s.remito_image_url,
+    });
+  });
+  
+  // Combinar todo
+  return trips.map(t => {
+    const tripShipments = shipmentsMap[t.id] || [];
+    const totalWeight = tripShipments.reduce((sum, s) => sum + (s.weight_kg || 0), 0);
+    const totalVolume = tripShipments.reduce((sum, s) => sum + (s.volume_m3 || 0), 0);
+    
+    return {
+      id: t.id,
+      origin: t.origin,
+      destination: t.destination,
+      status: t.status,
+      trip_type: t.trip_type || 'consolidado',
+      departure_time: t.departure_time,
+      agreed_price: t.agreed_price,
+      created_at: t.created_at,
+      vehicle: t.vehicle_id ? vehiclesMap[t.vehicle_id] || null : null,
+      shipments: tripShipments,
+      total_weight: totalWeight,
+      total_volume: totalVolume,
+      shipment_count: tripShipments.length,
+    };
+  });
 }
 
 export default async function ViajesPage() {
   await requireAuth("/viajes");
 
-  const trips = await getTrips();
+  const trips = await getTripsWithShipments();
 
   return (
     <div className="min-h-screen bg-white">
@@ -60,83 +113,7 @@ export default async function ViajesPage() {
             </Link>
           </div>
 
-          <div className="border border-neutral-200 rounded overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[900px]">
-                <thead>
-                  <tr className="bg-neutral-50 border-b border-neutral-200">
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">ID</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Tipo</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Ruta</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Cliente</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Vehículo</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Salida</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Precio</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trips.length === 0 ? (
-                    <tr><td colSpan={8} className="px-3 py-8 text-center text-neutral-400">Sin viajes</td></tr>
-                  ) : (
-                    trips.map((t: Record<string, unknown>) => {
-                      const isFTL = t.trip_type === 'camion_completo';
-                      return (
-                        <tr key={t.id as number} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
-                          <td className="px-3 py-2">
-                            <Link href={`/viajes/${t.id}`} className="font-mono text-orange-500 hover:underline">#{String(t.id)}</Link>
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-1.5">
-                              {isFTL ? (
-                                <Truck className="w-4 h-4 text-orange-500" />
-                              ) : (
-                                <Package className="w-4 h-4 text-blue-500" />
-                              )}
-                              <span className="text-xs text-neutral-600">
-                                {isFTL ? 'FTL' : 'Cons.'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-xs">
-                            <span className="font-medium">{t.origin as string}</span>
-                            <span className="text-neutral-400"> → </span>
-                            <span>{t.destination as string}</span>
-                          </td>
-                          <td className="px-3 py-2 text-neutral-600 truncate max-w-[150px]">
-                            {isFTL ? (
-                              (t.client as { legal_name: string })?.legal_name || '-'
-                            ) : (
-                              <span className="text-neutral-400 text-xs">Varios</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="text-neutral-600 text-xs">
-                              {(t.vehicle as { identifier: string })?.identifier || '-'}
-                            </div>
-                            <div className="font-mono text-neutral-400 text-[10px]">
-                              {(t.vehicle as { tractor_license_plate: string })?.tractor_license_plate || ''}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-neutral-600 text-xs whitespace-nowrap">
-                            {t.departure_time ? new Date(t.departure_time as string).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
-                          </td>
-                          <td className="px-3 py-2 font-medium">
-                            {isFTL ? formatCurrency(t.agreed_price as number) : '-'}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge variant={getStatusVariant(t.status as string)}>
-                              {TRIP_STATUS_LABELS[(t.status as keyof typeof TRIP_STATUS_LABELS)] || t.status as string}
-                            </Badge>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <TripsListClient trips={trips} />
         </div>
       </main>
     </div>

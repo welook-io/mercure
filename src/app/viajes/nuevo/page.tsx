@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
-import { Loader2, Save, ArrowLeft, Truck, Package, MapPin, Building2, Calendar, DollarSign, Weight, Box, User } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Truck, Package, MapPin, Building2, Calendar, DollarSign, Weight, Box, User, Home } from "lucide-react";
 import Link from "next/link";
 
 interface Entity {
@@ -18,9 +18,10 @@ interface Vehicle {
   tractor_license_plate: string | null;
   brand?: string;
   model?: string;
+  image_url?: string | null;
 }
 
-type TripType = 'consolidado' | 'camion_completo';
+type TripType = 'consolidado' | 'camion_completo' | 'ultima_milla';
 
 const ORIGINS = [
   'Buenos Aires',
@@ -40,20 +41,36 @@ const DESTINATIONS = [
   'Salta',
 ];
 
+// Depósitos para última milla
+const DEPOSITOS = [
+  'Depósito Jujuy',
+  'Depósito Salta',
+];
+
 export default function NuevoViajePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tipoParam = searchParams.get('tipo');
+  
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [tripType, setTripType] = useState<TripType>('consolidado');
+  // Determinar tipo inicial basado en parámetro URL
+  const getInitialType = (): TripType => {
+    if (tipoParam === 'ultima_milla') return 'ultima_milla';
+    if (tipoParam === 'viaje') return 'consolidado';
+    return 'consolidado';
+  };
+  
+  const [tripType, setTripType] = useState<TripType>(getInitialType());
   
   const [formData, setFormData] = useState({
     origin: 'Buenos Aires',
     destination: 'Jujuy',
-    vehicle_id: '',
+    vehicle_id: 'tercerizado_logisa',
     departure_time: '',
     // Conductor/Guía
     driver_name: '',
@@ -86,6 +103,25 @@ export default function NuevoViajePage() {
     }
     loadData();
   }, []);
+
+  // Actualizar origen cuando cambia el tipo de viaje
+  useEffect(() => {
+    if (tripType === 'ultima_milla') {
+      setFormData(prev => ({
+        ...prev,
+        origin: 'Depósito Jujuy',
+        destination: '', // Sin destino fijo para última milla
+        vehicle_id: '', // Requiere seleccionar vehículo
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        origin: 'Buenos Aires',
+        destination: 'Jujuy',
+        vehicle_id: 'tercerizado_logisa',
+      }));
+    }
+  }, [tripType]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
@@ -150,8 +186,14 @@ export default function NuevoViajePage() {
                 <ArrowLeft className="w-4 h-4" />
               </button>
             </Link>
-            <Truck className="w-5 h-5 text-neutral-400" />
-            <h1 className="text-lg font-medium text-neutral-900">Nuevo Viaje</h1>
+            {tripType === 'ultima_milla' ? (
+              <Home className="w-5 h-5 text-purple-500" />
+            ) : (
+              <Truck className="w-5 h-5 text-neutral-400" />
+            )}
+            <h1 className="text-lg font-medium text-neutral-900">
+              {tripType === 'ultima_milla' ? 'Nueva Última Milla' : 'Nuevo Viaje'}
+            </h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -162,7 +204,35 @@ export default function NuevoViajePage() {
             )}
 
             {/* Tipo de Viaje */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setTripType('consolidado')}
+                className={`p-4 border rounded-lg text-left transition-colors ${
+                  tripType === 'consolidado'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-neutral-200 hover:border-neutral-300'
+                }`}
+              >
+                <Package className={`w-6 h-6 mb-2 ${tripType === 'consolidado' ? 'text-blue-500' : 'text-neutral-400'}`} />
+                <div className="font-medium text-sm">Viaje</div>
+                <div className="text-xs text-neutral-500 mt-1">Recepción → Destino</div>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setTripType('ultima_milla')}
+                className={`p-4 border rounded-lg text-left transition-colors ${
+                  tripType === 'ultima_milla'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-neutral-200 hover:border-neutral-300'
+                }`}
+              >
+                <Home className={`w-6 h-6 mb-2 ${tripType === 'ultima_milla' ? 'text-purple-500' : 'text-neutral-400'}`} />
+                <div className="font-medium text-sm">Última Milla</div>
+                <div className="text-xs text-neutral-500 mt-1">Destino → Cliente</div>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setTripType('camion_completo')}
@@ -174,95 +244,179 @@ export default function NuevoViajePage() {
               >
                 <Truck className={`w-6 h-6 mb-2 ${tripType === 'camion_completo' ? 'text-orange-500' : 'text-neutral-400'}`} />
                 <div className="font-medium text-sm">Camión Completo</div>
-                <div className="text-xs text-neutral-500 mt-1">Flete dedicado de un proveedor a un cliente</div>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => setTripType('consolidado')}
-                className={`p-4 border rounded-lg text-left transition-colors ${
-                  tripType === 'consolidado'
-                    ? 'border-orange-500 bg-orange-50'
-                    : 'border-neutral-200 hover:border-neutral-300'
-                }`}
-              >
-                <Package className={`w-6 h-6 mb-2 ${tripType === 'consolidado' ? 'text-orange-500' : 'text-neutral-400'}`} />
-                <div className="font-medium text-sm">Consolidado</div>
-                <div className="text-xs text-neutral-500 mt-1">Múltiples envíos en un viaje</div>
+                <div className="text-xs text-neutral-500 mt-1">FTL dedicado</div>
               </button>
             </div>
 
             {/* Ruta y Vehículo */}
             <div className="border border-neutral-200 rounded overflow-hidden">
-              <div className="bg-neutral-50 px-3 py-2 border-b border-neutral-200">
+              <div className={`${tripType === 'ultima_milla' ? 'bg-purple-50 border-purple-200' : 'bg-neutral-50'} px-3 py-2 border-b border-neutral-200`}>
                 <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide flex items-center gap-2">
-                  <MapPin className="w-3 h-3" /> Ruta y Vehículo
+                  <MapPin className="w-3 h-3" /> {tripType === 'ultima_milla' ? 'Depósito y Vehículo' : 'Ruta y Vehículo'}
                 </span>
               </div>
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                    Origen
-                  </label>
-                  <select
-                    name="origin"
-                    value={formData.origin}
-                    onChange={handleChange}
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-                  >
-                    {ORIGINS.map(o => (
-                      <option key={o} value={o}>{o}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="p-4">
+                {tripType === 'ultima_milla' ? (
+                  /* ÚLTIMA MILLA: Depósito origen + Vehículo con foto */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
+                          Depósito de Salida
+                        </label>
+                        <select
+                          name="origin"
+                          value={formData.origin}
+                          onChange={handleChange}
+                          className="w-full h-10 px-3 border border-purple-200 rounded text-sm focus:border-purple-400 focus:ring-0 bg-purple-50"
+                        >
+                          {DEPOSITOS.map(d => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                    Destino
-                  </label>
-                  <select
-                    name="destination"
-                    value={formData.destination}
-                    onChange={handleChange}
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-                  >
-                    {DESTINATIONS.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-500 uppercase mb-1 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> Fecha/Hora Salida
+                        </label>
+                        <input
+                          type="datetime-local"
+                          name="departure_time"
+                          value={formData.departure_time}
+                          onChange={handleChange}
+                          className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
+                        />
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
-                    Vehículo
-                  </label>
-                  <select
-                    name="vehicle_id"
-                    value={formData.vehicle_id}
-                    onChange={handleChange}
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-                  >
-                    <option value="">Seleccionar...</option>
-                    {vehicles.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.identifier} {v.tractor_license_plate ? `(${v.tractor_license_plate})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    {/* Vehículo con foto para última milla */}
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
+                        Vehículo de Reparto
+                      </label>
+                      <div className="flex gap-4">
+                        <select
+                          name="vehicle_id"
+                          value={formData.vehicle_id}
+                          onChange={handleChange}
+                          className="flex-1 h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
+                        >
+                          <option value="">Seleccionar vehículo...</option>
+                          {vehicles.map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.identifier} {v.tractor_license_plate ? `(${v.tractor_license_plate})` : ''} {v.brand ? `- ${v.brand}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {/* Foto del vehículo seleccionado */}
+                        {formData.vehicle_id && formData.vehicle_id !== 'tercerizado_logisa' && (() => {
+                          const selectedVehicle = vehicles.find(v => v.id === parseInt(formData.vehicle_id));
+                          if (selectedVehicle?.image_url) {
+                            return (
+                              <div className="w-24 h-24 rounded-lg overflow-hidden border border-neutral-200 shrink-0">
+                                <img 
+                                  src={selectedVehicle.image_url} 
+                                  alt={selectedVehicle.identifier}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-neutral-500 uppercase mb-1 flex items-center gap-1">
-                    <Calendar className="w-3 h-3" /> Fecha/Hora Salida
-                  </label>
-                  <input
-                    type="datetime-local"
-                    name="departure_time"
-                    value={formData.departure_time}
-                    onChange={handleChange}
-                    className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
-                  />
-                </div>
+                    {/* Info de ruta */}
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-purple-900">Ruta de Entregas</p>
+                          <p className="text-xs text-purple-600 mt-1">Las direcciones se calcularán según las guías asignadas</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled
+                          className="h-9 px-4 text-sm bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded flex items-center gap-2"
+                          title="Próximamente"
+                        >
+                          <MapPin className="w-4 h-4" />
+                          Calcular Ruta Inteligente
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* VIAJE NORMAL: Origen, Destino, Vehículo, Fecha */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
+                        Origen
+                      </label>
+                      <select
+                        name="origin"
+                        value={formData.origin}
+                        onChange={handleChange}
+                        className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
+                      >
+                        {ORIGINS.map(o => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
+                        Destino
+                      </label>
+                      <select
+                        name="destination"
+                        value={formData.destination}
+                        onChange={handleChange}
+                        className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
+                      >
+                        {DESTINATIONS.map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase mb-1">
+                        Vehículo
+                      </label>
+                      <select
+                        name="vehicle_id"
+                        value={formData.vehicle_id}
+                        onChange={handleChange}
+                        className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
+                      >
+                        <option value="tercerizado_logisa">🚛 Tercerizado Logisa</option>
+                        <option value="" disabled>── Flota propia ──</option>
+                        {vehicles.map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.identifier} {v.tractor_license_plate ? `(${v.tractor_license_plate})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-neutral-500 uppercase mb-1 flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> Fecha/Hora Salida
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="departure_time"
+                        value={formData.departure_time}
+                        onChange={handleChange}
+                        className="w-full h-10 px-3 border border-neutral-200 rounded text-sm focus:border-neutral-400 focus:ring-0"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
