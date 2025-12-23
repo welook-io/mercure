@@ -18,6 +18,8 @@ type Shipment = {
   declared_value: number | null;
   status: string;
   created_at: string;
+  origin: string | null;
+  destination: string | null;
   sender: { legal_name: string } | null;
   recipient: { legal_name: string } | null;
   quotation: { total_price: number } | null;
@@ -407,6 +409,12 @@ export function ShipmentList({ shipments, totalCount, currentPage, pageSize, fil
                     <p className="font-medium">{s.delivery_note_number || `#${s.id}`}</p>
                   </div>
                   <div>
+                    <span className="text-xs text-neutral-500">Ruta</span>
+                    <p className="text-neutral-700">
+                      {s.origin && s.destination ? `${s.origin} → ${s.destination}` : '-'}
+                    </p>
+                  </div>
+                  <div>
                     <span className="text-xs text-neutral-500">Estado</span>
                     <div className="mt-0.5">
                       <Badge variant={getStatusVariant(s.status)}>
@@ -484,6 +492,7 @@ export function ShipmentList({ shipments, totalCount, currentPage, pageSize, fil
                     Destinatario <SortIcon field="recipient" />
                   </span>
                 </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Ruta</th>
                 <th 
                   className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase cursor-pointer hover:bg-neutral-100"
                   onClick={() => handleSort('package_quantity')}
@@ -551,6 +560,17 @@ export function ShipmentList({ shipments, totalCount, currentPage, pageSize, fil
                   <td className="px-3 py-2 font-medium">{s.delivery_note_number || `#${s.id}`}</td>
                   <td className="px-3 py-2 text-neutral-600 truncate max-w-[120px]">{s.sender?.legal_name || '-'}</td>
                   <td className="px-3 py-2 text-neutral-600 truncate max-w-[120px]">{s.recipient?.legal_name || '-'}</td>
+                  <td className="px-3 py-2 text-neutral-500 text-xs whitespace-nowrap">
+                    {s.origin && s.destination ? (
+                      <span>{s.origin} → {s.destination}</span>
+                    ) : s.origin ? (
+                      <span>Desde {s.origin}</span>
+                    ) : s.destination ? (
+                      <span>A {s.destination}</span>
+                    ) : (
+                      <span className="text-neutral-300">-</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right text-neutral-600">{s.package_quantity || '-'}</td>
                   <td className="px-3 py-2 text-right text-neutral-600">{s.weight_kg || '-'}</td>
                   <td className="px-3 py-2 text-right text-neutral-600">{s.volume_m3 || '-'}</td>
@@ -589,7 +609,7 @@ export function ShipmentList({ shipments, totalCount, currentPage, pageSize, fil
             </tbody>
             <tfoot>
               <tr className="bg-neutral-100 border-t border-neutral-300">
-                <td colSpan={8} className="px-3 py-2 text-right text-sm font-bold text-neutral-700">
+                <td colSpan={9} className="px-3 py-2 text-right text-sm font-bold text-neutral-700">
                   TOTAL FLETE (página)
                 </td>
                 <td className="px-3 py-2 text-right text-sm font-bold text-neutral-900">
