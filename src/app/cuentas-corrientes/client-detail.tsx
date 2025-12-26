@@ -47,6 +47,7 @@ interface Shipment {
   declared_value: number | null;
   calculated_amount: number;
   quotation_id: string | null;
+  pickup_fee?: number;
 }
 
 interface Settlement {

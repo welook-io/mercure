@@ -20,7 +20,8 @@ export async function getClientShipments(entityId: number) {
       quotation_id,
       sender_id,
       origin,
-      destination
+      destination,
+      pickup_fee
     `)
     .eq('recipient_id', entityId)
     .in('status', ['delivered', 'en_destino', 'arrived', 'rendida', 'entregado'])
@@ -58,19 +59,24 @@ export async function getClientShipments(entityId: number) {
   const mappedShipments = (shipmentsData || []).map((s) => {
     // Ahora mostramos el remitente (quien envió al cliente)
     const senderName = s.sender_id ? (sendersMap[s.sender_id] || '-') : '-';
+    const pickupFee = Number(s.pickup_fee) || 0;
     
-    // Calcular monto: prioridad 1. cotización, 2. cálculo básico por peso
+    // Calcular monto: prioridad 1. cotización (ya incluye pickup_fee), 2. cálculo básico por peso + pickup_fee
     let calculatedAmount = 0;
     if (s.quotation_id && quotationsMap[s.quotation_id]) {
+      // La cotización ya tiene el total con pickup_fee incluido
       calculatedAmount = quotationsMap[s.quotation_id];
     } else if (s.weight_kg && s.weight_kg > 0) {
-      // Fallback: cálculo básico por peso
+      // Fallback: cálculo básico por peso + pickup_fee
       const baseFlete = Math.max(s.weight_kg * 500, 5000);
       const insuranceCost = (s.declared_value || 0) * 0.008;
-      calculatedAmount = baseFlete + insuranceCost;
+      calculatedAmount = baseFlete + insuranceCost + pickupFee;
     } else if (s.declared_value && s.declared_value > 0) {
-      // Fallback 2: solo si hay valor declarado
-      calculatedAmount = s.declared_value * 0.05;
+      // Fallback 2: solo si hay valor declarado + pickup_fee
+      calculatedAmount = s.declared_value * 0.05 + pickupFee;
+    } else if (pickupFee > 0) {
+      // Fallback 3: solo pickup_fee si existe
+      calculatedAmount = pickupFee;
     }
 
     return {
@@ -85,6 +91,7 @@ export async function getClientShipments(entityId: number) {
       declared_value: s.declared_value || 0,
       calculated_amount: calculatedAmount,
       quotation_id: s.quotation_id,
+      pickup_fee: pickupFee,
     };
   });
   
@@ -142,6 +149,7 @@ interface ShipmentForSettlement {
   weight_kg: number | null;
   calculated_amount: number;
   quotation_id: string | null;
+  pickup_fee?: number;
 }
 
 export async function generateSettlement(
@@ -152,30 +160,33 @@ export async function generateSettlement(
 ) {
   if (!supabaseAdmin) throw new Error("No admin client");
   
-  // Cargar cotizaciones para obtener desglose de flete y seguro
+  // Cargar cotizaciones para obtener desglose de flete, seguro y retiro
   const shipmentsWithQuotations = await Promise.all(
     selectedShipments.map(async (s) => {
       let fleteAmount = 0;
       let seguroAmount = 0;
+      let pickupAmount = s.pickup_fee || 0;
       
       if (s.quotation_id) {
         const { data: quotation } = await supabaseAdmin!
           .schema('mercure')
           .from('quotations')
-          .select('base_price, insurance_cost')
+          .select('base_price, insurance_cost, pickup_fee')
           .eq('id', s.quotation_id)
           .single();
         fleteAmount = quotation?.base_price || 0;
         seguroAmount = quotation?.insurance_cost || 0;
+        pickupAmount = quotation?.pickup_fee || pickupAmount; // Usar el de cotización si existe
       }
       
-      return { ...s, fleteAmount, seguroAmount };
+      return { ...s, fleteAmount, seguroAmount, pickupAmount };
     })
   );
   
   const subtotalFlete = shipmentsWithQuotations.reduce((acc, s) => acc + s.fleteAmount, 0);
   const subtotalSeguro = shipmentsWithQuotations.reduce((acc, s) => acc + s.seguroAmount, 0);
-  const subtotal = subtotalFlete + subtotalSeguro;
+  const subtotalRetiro = shipmentsWithQuotations.reduce((acc, s) => acc + s.pickupAmount, 0);
+  const subtotal = subtotalFlete + subtotalSeguro + subtotalRetiro;
   const iva = subtotal * 0.21;
   const total = subtotal + iva;
 

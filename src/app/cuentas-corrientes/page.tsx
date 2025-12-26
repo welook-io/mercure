@@ -23,7 +23,7 @@ async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
   // IMPORTANTE: El cliente es el DESTINATARIO (recipient_id), no el remitente
   const { data: shipments, error: shipmentsError } = await supabaseAdmin!
     .schema('mercure').from('shipments')
-    .select('id, recipient_id, quotation_id, status, declared_value, weight_kg')
+    .select('id, recipient_id, quotation_id, status, declared_value, weight_kg, pickup_fee')
     .in('status', ['delivered', 'en_destino', 'arrived', 'rendida', 'entregado']);
 
   if (shipmentsError) {
@@ -76,19 +76,24 @@ async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
     
     // Saldo de remitos = suma de precios de cotización o fallback
     const shipmentsBalance = entityShipments.reduce((acc, s) => {
-      // Prioridad: 1. Cotización, 2. Cálculo básico por peso
+      // Prioridad: 1. Cotización (ya incluye pickup_fee), 2. Cálculo básico por peso + pickup_fee
       let price = 0;
+      const pickupFee = Number(s.pickup_fee) || 0;
       
       if (s.quotation_id && quotationsMap[s.quotation_id]) {
+        // La cotización ya tiene el total con pickup_fee incluido
         price = quotationsMap[s.quotation_id];
       } else if (s.weight_kg && s.weight_kg > 0) {
-        // Fallback: cálculo básico (tarifa promedio $500/kg + seguro 0.8%)
+        // Fallback: cálculo básico (tarifa promedio $500/kg + seguro 0.8% + pickup_fee)
         const baseFlete = Math.max(s.weight_kg * 500, 5000); // Mínimo $5000
         const insuranceCost = (s.declared_value || 0) * 0.008;
-        price = baseFlete + insuranceCost;
+        price = baseFlete + insuranceCost + pickupFee;
       } else if (s.declared_value && s.declared_value > 0) {
-        // Fallback 2: solo seguro si hay valor declarado
-        price = s.declared_value * 0.05; // 5% aproximado
+        // Fallback 2: solo seguro si hay valor declarado + pickup_fee
+        price = s.declared_value * 0.05 + pickupFee; // 5% aproximado
+      } else if (pickupFee > 0) {
+        // Fallback 3: solo pickup_fee si existe
+        price = pickupFee;
       }
       
       return acc + price;
