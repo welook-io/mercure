@@ -6,6 +6,7 @@ export async function getClientShipments(entityId: number) {
   if (!supabaseAdmin) throw new Error("No admin client");
   
   // Obtener envíos pendientes de cobro (entregados pero no facturados)
+  // El cliente es el DESTINATARIO (recipient_id), quien recibe y paga
   const { data: shipmentsData } = await supabaseAdmin
     .schema('mercure')
     .from('shipments')
@@ -17,25 +18,25 @@ export async function getClientShipments(entityId: number) {
       weight_kg,
       declared_value,
       quotation_id,
-      recipient_id,
+      sender_id,
       origin,
       destination
     `)
-    .eq('sender_id', entityId)
+    .eq('recipient_id', entityId)
     .in('status', ['delivered', 'en_destino', 'arrived', 'rendida', 'entregado'])
     .order('created_at', { ascending: false });
   
-  // Obtener nombres de destinatarios
-  const recipientIds = [...new Set((shipmentsData || []).map(s => s.recipient_id).filter(Boolean))];
-  let recipientsMap: Record<number, string> = {};
-  if (recipientIds.length > 0) {
-    const { data: recipients } = await supabaseAdmin
+  // Obtener nombres de remitentes (quien envió al cliente)
+  const senderIds = [...new Set((shipmentsData || []).map(s => s.sender_id).filter(Boolean))];
+  let sendersMap: Record<number, string> = {};
+  if (senderIds.length > 0) {
+    const { data: senders } = await supabaseAdmin
       .schema('mercure')
       .from('entities')
       .select('id, legal_name')
-      .in('id', recipientIds);
-    if (recipients) {
-      recipientsMap = Object.fromEntries(recipients.map(r => [r.id, r.legal_name]));
+      .in('id', senderIds);
+    if (senders) {
+      sendersMap = Object.fromEntries(senders.map(r => [r.id, r.legal_name]));
     }
   }
 
@@ -55,7 +56,8 @@ export async function getClientShipments(entityId: number) {
 
   // Mapear envíos con datos
   const mappedShipments = (shipmentsData || []).map((s) => {
-    const recipientName = s.recipient_id ? (recipientsMap[s.recipient_id] || '-') : '-';
+    // Ahora mostramos el remitente (quien envió al cliente)
+    const senderName = s.sender_id ? (sendersMap[s.sender_id] || '-') : '-';
     
     // Calcular monto: prioridad 1. cotización, 2. cálculo básico por peso
     let calculatedAmount = 0;
@@ -75,7 +77,7 @@ export async function getClientShipments(entityId: number) {
       id: s.id,
       delivery_note_number: s.delivery_note_number,
       created_at: s.created_at,
-      recipient_name: recipientName,
+      sender_name: senderName, // Quien envió al cliente
       origin: s.origin || 'Buenos Aires',
       destination: s.destination || 'Jujuy',
       package_quantity: s.package_quantity,
@@ -133,7 +135,7 @@ interface ShipmentForSettlement {
   id: number;
   delivery_note_number: string | null;
   created_at: string;
-  recipient_name: string;
+  sender_name: string; // Quien envió al cliente (el cliente es el destinatario)
   origin: string;
   destination: string;
   package_quantity: number | null;
@@ -211,7 +213,7 @@ export async function generateSettlement(
     shipment_id: s.id,
     delivery_note_number: s.delivery_note_number || `#${s.id}`,
     emission_date: s.created_at,
-    recipient_name: s.recipient_name,
+    recipient_name: s.sender_name, // Guardamos el remitente (quien envió al cliente)
     origin: s.origin,
     destination: s.destination,
     package_quantity: s.package_quantity,

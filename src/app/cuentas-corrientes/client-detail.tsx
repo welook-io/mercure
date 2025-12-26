@@ -39,7 +39,7 @@ interface Shipment {
   id: number;
   delivery_note_number: string | null;
   created_at: string;
-  recipient_name: string;
+  sender_name: string; // Quien envió al cliente (el cliente es el destinatario)
   origin: string;
   destination: string;
   package_quantity: number | null;
@@ -254,7 +254,7 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
                       <th className="px-3 py-2 w-8"></th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remito</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Fecha</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Destinatario</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remitente</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Importe</th>
                     </tr>
                   </thead>
@@ -281,7 +281,7 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
                           {formatDate(shipment.created_at)}
                         </td>
                         <td className="px-3 py-2 text-neutral-600 truncate max-w-[150px]">
-                          {shipment.recipient_name}
+                          {shipment.sender_name}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">
                           ${formatCurrency(shipment.calculated_amount)}

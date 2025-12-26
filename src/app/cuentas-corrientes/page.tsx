@@ -20,23 +20,24 @@ interface ClientWithBalance {
 async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
   // Obtener envíos pendientes de cobro (entregados pero no pagados)
   // Status: delivered, en_destino, arrived = ya llegaron/entregaron, pendiente de cobro
+  // IMPORTANTE: El cliente es el DESTINATARIO (recipient_id), no el remitente
   const { data: shipments, error: shipmentsError } = await supabaseAdmin!
     .schema('mercure').from('shipments')
-    .select('id, sender_id, quotation_id, status, declared_value, weight_kg')
+    .select('id, recipient_id, quotation_id, status, declared_value, weight_kg')
     .in('status', ['delivered', 'en_destino', 'arrived', 'rendida', 'entregado']);
 
   if (shipmentsError) {
     console.error('[CC] Error fetching shipments:', shipmentsError);
   }
 
-  // Obtener IDs únicos de remitentes con envíos pendientes
-  const senderIdsWithShipments = [...new Set((shipments || []).map(s => s.sender_id).filter(Boolean))];
+  // Obtener IDs únicos de DESTINATARIOS con envíos pendientes (el cliente es quien recibe y paga)
+  const recipientIdsWithShipments = [...new Set((shipments || []).map(s => s.recipient_id).filter(Boolean))];
   
   // Obtener TODOS los clientes que tienen envíos pendientes O tienen payment_terms = cuenta_corriente
   const { data: entities } = await supabaseAdmin!
     .schema('mercure').from('entities')
     .select('id, legal_name, tax_id, address, phone, email, payment_terms, initial_balance')
-    .or(`payment_terms.eq.cuenta_corriente,id.in.(${senderIdsWithShipments.join(',') || '0'})`)
+    .or(`payment_terms.eq.cuenta_corriente,id.in.(${recipientIdsWithShipments.join(',') || '0'})`)
     .order('legal_name');
 
   if (!entities || entities.length === 0) {
@@ -69,7 +70,8 @@ async function getClientsWithBalance(): Promise<ClientWithBalance[]> {
 
   // Procesar datos
   const clientsWithBalance: ClientWithBalance[] = entities.map(entity => {
-    const entityShipments = (shipments || []).filter(s => s.sender_id === entity.id);
+    // El cliente es el DESTINATARIO (recipient_id)
+    const entityShipments = (shipments || []).filter(s => s.recipient_id === entity.id);
     const pendingCount = entityShipments.length;
     
     // Saldo de remitos = suma de precios de cotización o fallback
