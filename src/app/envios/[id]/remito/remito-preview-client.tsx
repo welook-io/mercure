@@ -36,6 +36,7 @@ interface ShipmentData {
   quotation?: {
     base_price: number;
     insurance_cost: number;
+    pickup_fee: number;
     total_price: number;
     includes_iva: boolean;
   } | null;

@@ -42,7 +42,7 @@ async function getShipmentData(id: number) {
   if (shipment.quotation_id) {
     const { data } = await supabaseAdmin
       .schema('mercure').from('quotations')
-      .select('base_price, insurance_cost, total_price, includes_iva')
+      .select('base_price, insurance_cost, pickup_fee, total_price, includes_iva')
       .eq('id', shipment.quotation_id)
       .single();
     quotation = data;

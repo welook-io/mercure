@@ -5,6 +5,7 @@ import Image from "next/image";
 interface QuotationData {
   base_price: number;
   insurance_cost: number;
+  pickup_fee: number;
   total_price: number;
   includes_iva: boolean;
 }
@@ -89,18 +90,20 @@ export function RemitoDocumentV2({ shipment }: RemitoDocumentProps) {
   const quotation: QuotationData = rawQuotation ? {
     base_price: Number(rawQuotation.base_price) || 0,
     insurance_cost: Number(rawQuotation.insurance_cost) || 0,
+    pickup_fee: Number(rawQuotation.pickup_fee) || 0,
     total_price: Number(rawQuotation.total_price) || 0,
     includes_iva: rawQuotation.includes_iva || false,
   } : {
     base_price: 0,
     insurance_cost: 0,
+    pickup_fee: 0,
     total_price: 0,
     includes_iva: false,
   };
   
   const hasQuotation = !!rawQuotation && quotation.total_price > 0;
 
-  const subtotal = quotation.base_price + quotation.insurance_cost;
+  const subtotal = quotation.base_price + quotation.insurance_cost + quotation.pickup_fee;
   const iva = subtotal * 0.21;
   const total = subtotal + iva;
 
@@ -228,6 +231,12 @@ export function RemitoDocumentV2({ shipment }: RemitoDocumentProps) {
                   <span>Seguro</span>
                   <span className="font-mono">{formatCurrency(quotation.insurance_cost)}</span>
                 </div>
+                {quotation.pickup_fee > 0 && (
+                  <div className="flex justify-between">
+                    <span>Retiro</span>
+                    <span className="font-mono">{formatCurrency(quotation.pickup_fee)}</span>
+                  </div>
+                )}
                 <div className="border-t border-neutral-100 pt-1.5 mt-1.5">
                   <div className="flex justify-between text-neutral-500 text-[10px]">
                     <span>Subtotal</span>
