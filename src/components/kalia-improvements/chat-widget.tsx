@@ -27,7 +27,7 @@ export function KaliaImprovementsChatWidget() {
       <ChatButton />
       
       {/* Chat Modal */}
-      <div className="fixed bottom-20 right-4 w-[380px] max-w-[calc(100vw-32px)] bg-white rounded-lg shadow-xl border border-neutral-200 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
+      <div className="fixed bottom-20 right-4 w-[380px] max-w-[calc(100vw-32px)] bg-white rounded-lg shadow-xl border border-neutral-200 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-2 duration-200 print:hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 bg-neutral-50">
           <div className="flex items-center gap-2">

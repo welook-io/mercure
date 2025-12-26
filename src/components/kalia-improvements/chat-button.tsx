@@ -114,6 +114,7 @@ export function ChatButton() {
           transition-all duration-200
           border border-neutral-700
           opacity-60 hover:opacity-100
+          print:hidden
         `}
         aria-label="Mostrar chat de feedback"
       >
@@ -128,7 +129,7 @@ export function ChatButton() {
   return (
     <div
       ref={buttonRef}
-      className={`fixed ${CORNER_POSITIONS[corner]} z-50 flex items-center gap-1`}
+      className={`fixed ${CORNER_POSITIONS[corner]} z-50 flex items-center gap-1 print:hidden`}
     >
       {/* Botón principal - arrastrable */}
       <div
