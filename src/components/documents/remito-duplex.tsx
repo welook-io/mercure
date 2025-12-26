@@ -323,25 +323,25 @@ export function RemitoDuplex({ shipment }: RemitoDuplexProps) {
   return (
     <div className="flex h-full bg-white">
       {/* Original (izquierda) */}
-      <div className="w-1/2 h-full">
+      <div className="flex-1 h-full min-w-0">
         <RemitoHalf shipment={shipment} type="ORIGINAL" />
       </div>
       
       {/* Línea de corte con tijerita */}
-      <div className="relative flex flex-col items-center justify-center" style={{ width: '1px' }}>
+      <div className="relative flex flex-col items-center justify-center px-1" style={{ width: '20px' }}>
         {/* Línea punteada vertical */}
         <div 
-          className="absolute inset-0 border-l-2 border-dashed border-neutral-300"
+          className="absolute inset-y-4 left-1/2 -translate-x-1/2 w-0"
           style={{ 
-            backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 4px, transparent 4px, transparent 8px)',
+            borderLeft: '2px dashed #d4d4d4',
           }}
         ></div>
         
         {/* Tijerita en el centro */}
-        <div className="relative z-10 bg-white px-1 py-2">
+        <div className="relative z-10 bg-white py-2 flex flex-col items-center gap-1">
           <svg 
-            width="16" 
-            height="16" 
+            width="14" 
+            height="14" 
             viewBox="0 0 24 24" 
             fill="none" 
             stroke="currentColor" 
@@ -356,11 +356,12 @@ export function RemitoDuplex({ shipment }: RemitoDuplexProps) {
             <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
             <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
           </svg>
+          <span className="text-[6px] text-neutral-400 font-medium tracking-tight" style={{ writingMode: 'vertical-lr' }}>CORTAR</span>
         </div>
       </div>
       
       {/* Duplicado (derecha) */}
-      <div className="w-1/2 h-full">
+      <div className="flex-1 h-full min-w-0">
         <RemitoHalf shipment={shipment} type="DUPLICADO" />
       </div>
     </div>
