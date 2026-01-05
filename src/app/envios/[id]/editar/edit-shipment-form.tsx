@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Loader2, Calculator, Trash2, Upload, Image as ImageIcon, X, ChevronDown, ChevronUp, Info } from "lucide-react";
-import Link from "next/link";
 
 interface Entity {
   id: number;
@@ -126,7 +125,6 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
   const [newQuotation, setNewQuotation] = useState<{ price: number; breakdown: Record<string, number> } | null>(null);
   const [pricingResult, setPricingResult] = useState<PricingResult | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [manualPrice, setManualPrice] = useState<string>('');
   const [manualFlete, setManualFlete] = useState<string>('');
   const [manualSeguro, setManualSeguro] = useState<string>('');
   const [useManualPrice, setUseManualPrice] = useState(false);

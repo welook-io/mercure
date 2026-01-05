@@ -71,7 +71,7 @@ export async function PUT(request: NextRequest) {
     if (newQuotation && newQuotation.price > 0) {
       console.log('[PUT /api/shipments] Creating quotation with price:', newQuotation.price);
       
-      const recipient = entities?.find((e: any) => e.id.toString() === updateData.recipient_id);
+      const recipient = entities?.find((e: { id: number; legal_name: string; tax_id: string | null }) => e.id.toString() === updateData.recipient_id);
       console.log('[PUT /api/shipments] Found recipient:', recipient?.legal_name || 'NOT FOUND');
       
       // Calcular peso cobrado: el mayor entre peso real y peso volumétrico (m³ * 300)

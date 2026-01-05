@@ -63,7 +63,8 @@ const TARIFAS_BASE_DEPOSITO: [number, number, number, number, number][] = [
 ];
 
 // POST: Ejecutar migración de tarifas 2026
-export async function POST(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function POST(_request: NextRequest) {
   try {
     if (!supabaseAdmin) {
       return NextResponse.json({ error: 'No admin client' }, { status: 500 });
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
     // ============================================
     
     // Generar tarifas base para cada ruta
-    const baseTariffs: any[] = [];
+    const baseTariffs: Record<string, string | number | boolean | null>[] = [];
     
     // Rutas con sus precios por m3
     const routes = [
