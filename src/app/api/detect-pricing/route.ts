@@ -47,12 +47,14 @@ interface DebugInfo {
     origin: string;
     destination: string;
   };
-  decision: {
-    pesoReal: number;
-    pesoVolumetrico: number;
-    factorConversion: number;
-    pesoACobrar: number;
-    criterioUsado: 'PESO_REAL' | 'PESO_VOLUMETRICO' | 'VOLUMEN_DIRECTO';
+  // NUEVO: Comparación de importes según Regla de Oro
+  comparacionImportes: {
+    pesoKg: number;
+    volumenM3: number;
+    importePorPeso: number;
+    importePorVolumen: number;
+    precioPorM3: number | null;
+    criterioGanador: 'PESO' | 'VOLUMEN' | 'SOLO_PESO' | 'SOLO_VOLUMEN' | 'SIN_DATOS';
     explicacion: string;
   };
   tarifa: {
@@ -62,6 +64,7 @@ interface DebugInfo {
     destino?: string;
     rangoKg?: string;
     precioLista?: number;
+    precioPorM3?: number;
     queryUsada?: string;
   };
   calculo: {
@@ -139,9 +142,17 @@ interface PricingResult {
   debug?: DebugInfo;
 }
 
-// Factor de conversión M³ a Kg (peso volumétrico)
-// 1 m³ = 300 kg (estándar en transporte terrestre)
-const VOLUMETRIC_FACTOR = 300;
+// ============================================================================
+// REGLA DE ORO (Mercure/Melisa): Comparación de IMPORTES, no de Kilos
+// El sistema NO convierte m³ a kg volumétrico.
+// En su lugar, calcula cuánta plata da cada método y se queda con el mayor.
+// 
+// Algoritmo:
+// 1. Calcular IMPORTE por peso: buscar_tarifa_kg(peso_real)
+// 2. Calcular IMPORTE por volumen: volumen_m3 × precio_por_m3
+// 3. Precio final = MAX(importe_peso, importe_volumen)
+// ============================================================================
+
 const DEFAULT_INSURANCE_RATE = 0.008; // 8 por mil
 const TONNAGE_THRESHOLD = 1000; // Umbral para tarifas por tonelaje
 
@@ -317,12 +328,13 @@ async function buscarTarifaTonelaje(
 }
 
 // Buscar tarifa por origen, destino y peso
+// NUEVO: También busca precio_per_m3 para comparación de importes
 async function buscarTarifa(
   origin: string, 
   destination: string, 
   pesoKg: number,
   deliveryType: 'deposito' | 'domicilio' = 'deposito'
-): Promise<{ tarifa: any | null; debug: string; usaTonelaje?: boolean }> {
+): Promise<{ tarifa: any | null; debug: string; usaTonelaje?: boolean; precioPorM3?: number | null }> {
   
   const originsToTry = normalizeCity(origin);
   const destinationsToTry = normalizeCity(destination);
@@ -333,7 +345,9 @@ async function buscarTarifa(
       origin, destination, pesoKg, deliveryType
     );
     if (tarifaTonelaje) {
-      return { tarifa: tarifaTonelaje, debug: debugTonelaje, usaTonelaje: true };
+      // Buscar precio por M3 de la misma ruta
+      const precioPorM3 = await buscarPrecioPorM3(originsToTry, destinationsToTry, deliveryType);
+      return { tarifa: tarifaTonelaje, debug: debugTonelaje, usaTonelaje: true, precioPorM3 };
     }
   }
   
@@ -360,7 +374,8 @@ async function buscarTarifa(
       if (tariff) {
         return { 
           tarifa: tariff, 
-          debug: `Encontrada: ${orig} -> ${dest}, ${tariff.weight_from_kg}-${tariff.weight_to_kg}kg = $${tariff.price} (${deliveryType}${tariff.includes_iva ? ', +IVA' : ''})` 
+          debug: `Encontrada: ${orig} -> ${dest}, ${tariff.weight_from_kg}-${tariff.weight_to_kg}kg = $${tariff.price} (${deliveryType}${tariff.includes_iva ? ', +IVA' : ''})`,
+          precioPorM3: tariff.price_per_m3 ? parseFloat(tariff.price_per_m3) : null
         };
       }
     }
@@ -383,7 +398,8 @@ async function buscarTarifa(
       if (tariff) {
         return { 
           tarifa: tariff, 
-          debug: `Encontrada (sin filtro delivery): ${orig} -> ${dest}, ${tariff.weight_from_kg}-${tariff.weight_to_kg}kg = $${tariff.price}` 
+          debug: `Encontrada (sin filtro delivery): ${orig} -> ${dest}, ${tariff.weight_from_kg}-${tariff.weight_to_kg}kg = $${tariff.price}`,
+          precioPorM3: tariff.price_per_m3 ? parseFloat(tariff.price_per_m3) : null
         };
       }
     }
@@ -406,44 +422,167 @@ async function buscarTarifa(
     if (fallbackTariff) {
       return { 
         tarifa: fallbackTariff, 
-        debug: `FALLBACK (mismo origen, destino diferente): ${fallbackTariff.origin} -> ${fallbackTariff.destination}, ${fallbackTariff.weight_to_kg}kg = $${fallbackTariff.price}. NOTA: No hay tarifa para ${destination}.` 
+        debug: `FALLBACK (mismo origen, destino diferente): ${fallbackTariff.origin} -> ${fallbackTariff.destination}, ${fallbackTariff.weight_to_kg}kg = $${fallbackTariff.price}. NOTA: No hay tarifa para ${destination}.`,
+        precioPorM3: fallbackTariff.price_per_m3 ? parseFloat(fallbackTariff.price_per_m3) : null
       };
     }
   }
   
-  return { tarifa: null, debug: `NO ENCONTRADA para ${origin} -> ${destination}, ${weightBucket}kg. Agregar tarifario para esta ruta.` };
+  return { tarifa: null, debug: `NO ENCONTRADA para ${origin} -> ${destination}, ${weightBucket}kg. Agregar tarifario para esta ruta.`, precioPorM3: null };
 }
 
-// Calcular peso a cobrar
-function calcularPesoACobrar(cargo: { weightKg?: number; volumeM3?: number }): {
-  pesoReal: number;
-  pesoVolumetrico: number;
-  pesoACobrar: number;
-  usaVolumen: boolean;
-  explicacion: string;
-} {
-  const pesoReal = cargo.weightKg || 0;
-  const pesoVolumetrico = cargo.volumeM3 ? cargo.volumeM3 * VOLUMETRIC_FACTOR : 0;
-  const pesoACobrar = Math.max(pesoReal, pesoVolumetrico);
-  const usaVolumen = pesoVolumetrico > pesoReal;
-  
-  let explicacion = '';
-  if (pesoReal > 0 && pesoVolumetrico > 0) {
-    explicacion = usaVolumen 
-      ? `Volumen (${cargo.volumeM3}m³ × ${VOLUMETRIC_FACTOR} = ${pesoVolumetrico}kg) > Peso real (${pesoReal}kg) → Cobro por VOLUMÉTRICO`
-      : `Peso real (${pesoReal}kg) ≥ Volumen (${cargo.volumeM3}m³ × ${VOLUMETRIC_FACTOR} = ${pesoVolumetrico}kg) → Cobro por PESO REAL`;
-  } else if (pesoReal > 0) {
-    explicacion = `Solo hay peso real (${pesoReal}kg), sin volumen → Cobro por PESO REAL`;
-  } else if (pesoVolumetrico > 0) {
-    explicacion = `Solo hay volumen (${cargo.volumeM3}m³ × ${VOLUMETRIC_FACTOR} = ${pesoVolumetrico}kg), sin peso → Cobro por VOLUMÉTRICO`;
-  } else {
-    explicacion = `No hay peso ni volumen → No se puede calcular`;
+// Buscar precio por M3 para una ruta específica
+async function buscarPrecioPorM3(
+  originsToTry: string[],
+  destinationsToTry: string[],
+  deliveryType: 'deposito' | 'domicilio' = 'deposito'
+): Promise<number | null> {
+  // Buscar cualquier tarifa de la ruta que tenga price_per_m3
+  for (const orig of originsToTry) {
+    for (const dest of destinationsToTry) {
+      const { data: tariff } = await mercure()
+        .from('tariffs')
+        .select('price_per_m3')
+        .ilike('origin', orig)
+        .ilike('destination', dest)
+        .eq('delivery_type', deliveryType)
+        .not('price_per_m3', 'is', null)
+        .limit(1)
+        .single();
+      
+      if (tariff?.price_per_m3) {
+        return parseFloat(tariff.price_per_m3);
+      }
+    }
   }
   
-  return { pesoReal, pesoVolumetrico, pesoACobrar, usaVolumen, explicacion };
+  // Fallback sin delivery_type
+  for (const orig of originsToTry) {
+    for (const dest of destinationsToTry) {
+      const { data: tariff } = await mercure()
+        .from('tariffs')
+        .select('price_per_m3')
+        .ilike('origin', orig)
+        .ilike('destination', dest)
+        .not('price_per_m3', 'is', null)
+        .limit(1)
+        .single();
+      
+      if (tariff?.price_per_m3) {
+        return parseFloat(tariff.price_per_m3);
+      }
+    }
+  }
+  
+  return null;
+}
+
+// ============================================================================
+// REGLA DE ORO MERCURE: Comparación de IMPORTES (no de kilos)
+// ============================================================================
+// 
+// Algoritmo (según Melisa):
+// A. Cálculo por PESO REAL:
+//    - Toma los Kilos reales de la balanza
+//    - Busca en el tarifario el precio para ese rango de kilos
+//    - Resultado A: importe por peso
+//
+// B. Cálculo por VOLUMEN REAL:
+//    - Toma los Metros Cúbicos reales
+//    - Busca el valor del m³ en el tarifario
+//    - Multiplica: m³ × precio_por_m3
+//    - Resultado B: importe por volumen
+//
+// C. La Decisión:
+//    - Precio Final = MAX(Resultado A, Resultado B)
+//
+// CRÍTICO: NO convertir m³ a kg volumétrico (m³ × 300 = kg). 
+//          Eso es lo que Melisa dice que está mal.
+// ============================================================================
+
+interface ComparacionImportes {
+  pesoKg: number;
+  volumenM3: number;
+  
+  // Cálculo por peso
+  importePorPeso: number;
+  tarifaPesoUsada: string;
+  
+  // Cálculo por volumen
+  importePorVolumen: number;
+  precioPorM3: number | null;
+  
+  // Decisión final
+  importeFinal: number;
+  criterioGanador: 'PESO' | 'VOLUMEN' | 'SOLO_PESO' | 'SOLO_VOLUMEN' | 'SIN_DATOS';
+  explicacion: string;
+}
+
+// Comparar importes según Regla de Oro de Mercure
+function compararImportes(
+  pesoKg: number,
+  volumenM3: number,
+  importePorPeso: number,
+  precioPorM3: number | null
+): ComparacionImportes {
+  
+  const importePorVolumen = (precioPorM3 && volumenM3 > 0) 
+    ? volumenM3 * precioPorM3 
+    : 0;
+  
+  let importeFinal = 0;
+  let criterioGanador: ComparacionImportes['criterioGanador'] = 'SIN_DATOS';
+  let explicacion = '';
+  
+  const tienePeso = pesoKg > 0 && importePorPeso > 0;
+  const tieneVolumen = volumenM3 > 0 && precioPorM3 && precioPorM3 > 0;
+  
+  if (tienePeso && tieneVolumen) {
+    // REGLA DE ORO: Comparar importes, quedarse con el mayor
+    if (importePorVolumen > importePorPeso) {
+      criterioGanador = 'VOLUMEN';
+      importeFinal = importePorVolumen;
+      explicacion = `Comparación de importes: 
+        → Por PESO: ${pesoKg}kg = $${importePorPeso.toLocaleString('es-AR')}
+        → Por VOLUMEN: ${volumenM3}m³ × $${precioPorM3!.toLocaleString('es-AR')}/m³ = $${importePorVolumen.toLocaleString('es-AR')}
+        ✓ GANA VOLUMEN ($${importePorVolumen.toLocaleString('es-AR')} > $${importePorPeso.toLocaleString('es-AR')})`;
+    } else {
+      criterioGanador = 'PESO';
+      importeFinal = importePorPeso;
+      explicacion = `Comparación de importes: 
+        → Por PESO: ${pesoKg}kg = $${importePorPeso.toLocaleString('es-AR')}
+        → Por VOLUMEN: ${volumenM3}m³ × $${precioPorM3!.toLocaleString('es-AR')}/m³ = $${importePorVolumen.toLocaleString('es-AR')}
+        ✓ GANA PESO ($${importePorPeso.toLocaleString('es-AR')} ≥ $${importePorVolumen.toLocaleString('es-AR')})`;
+    }
+  } else if (tienePeso) {
+    criterioGanador = 'SOLO_PESO';
+    importeFinal = importePorPeso;
+    explicacion = `Solo hay peso (${pesoKg}kg) = $${importePorPeso.toLocaleString('es-AR')}${!precioPorM3 ? ' (sin tarifa de m³ configurada)' : ''}`;
+  } else if (tieneVolumen) {
+    criterioGanador = 'SOLO_VOLUMEN';
+    importeFinal = importePorVolumen;
+    explicacion = `Solo hay volumen (${volumenM3}m³ × $${precioPorM3!.toLocaleString('es-AR')}/m³) = $${importePorVolumen.toLocaleString('es-AR')}`;
+  } else {
+    criterioGanador = 'SIN_DATOS';
+    importeFinal = 0;
+    explicacion = 'No hay peso ni volumen → No se puede calcular';
+  }
+  
+  return {
+    pesoKg,
+    volumenM3,
+    importePorPeso,
+    tarifaPesoUsada: '',  // Se llena después
+    importePorVolumen,
+    precioPorM3,
+    importeFinal,
+    criterioGanador,
+    explicacion
+  };
 }
 
 // CAMINO A: Cliente Cuenta Corriente
+// Implementa la REGLA DE ORO: Comparación de IMPORTES (no de kilos)
 async function handlePathA(
   client: any, 
   cargo: { packageQuantity?: number; weightKg?: number; volumeM3?: number; declaredValue?: number; origin?: string; destination?: string },
@@ -472,21 +611,24 @@ async function handlePathA(
     cargo.destination
   );
 
-  // Calcular peso a cobrar
-  const { pesoReal, pesoVolumetrico, pesoACobrar, usaVolumen, explicacion } = calcularPesoACobrar(cargo);
+  const pesoKg = cargo.weightKg || 0;
+  const volumenM3 = cargo.volumeM3 || 0;
   
   let price: number | null = null;
   let breakdown: Record<string, number> = {};
   let specialTariffId: number | undefined = undefined;
+  
+  // Inicializar debug con valores por defecto
   let debug: DebugInfo = {
     input: debugInput,
-    decision: {
-      pesoReal,
-      pesoVolumetrico,
-      factorConversion: VOLUMETRIC_FACTOR,
-      pesoACobrar,
-      criterioUsado: usaVolumen ? 'PESO_VOLUMETRICO' : 'PESO_REAL',
-      explicacion,
+    comparacionImportes: {
+      pesoKg,
+      volumenM3,
+      importePorPeso: 0,
+      importePorVolumen: 0,
+      precioPorM3: null,
+      criterioGanador: 'SIN_DATOS',
+      explicacion: '',
     },
     tarifa: { encontrada: false },
     calculo: {
@@ -500,111 +642,134 @@ async function handlePathA(
     },
   };
 
-  if (pesoACobrar > 0) {
-    const { tarifa, debug: tarifaDebug, usaTonelaje } = await buscarTarifa(
-      cargo.origin || 'Buenos Aires', 
-      cargo.destination || 'San Salvador de Jujuy', 
-      pesoACobrar,
-      deliveryType
-    );
+  // PASO 1: Buscar tarifa por PESO (usando peso real, no volumétrico)
+  const { tarifa, debug: tarifaDebug, usaTonelaje, precioPorM3 } = await buscarTarifa(
+    cargo.origin || 'Buenos Aires', 
+    cargo.destination || 'San Salvador de Jujuy', 
+    pesoKg > 0 ? pesoKg : 1, // Mínimo 1kg para buscar
+    deliveryType
+  );
 
-    if (tarifa) {
-      // Si es tarifa por tonelaje, calcular diferente
-      let basePrice: number;
-      if (usaTonelaje) {
-        basePrice = pesoACobrar * (parseFloat(tarifa.price_per_kg) || 0);
-        debug.tarifa = {
-          encontrada: true,
-          id: tarifa.id,
-          origen: tarifa.origin,
-          destino: tarifa.destination,
-          rangoKg: `${tarifa.tonnage_from_kg}-${tarifa.tonnage_to_kg || '+'}kg (tonelaje)`,
-          precioLista: basePrice,
-          queryUsada: tarifaDebug,
-        };
-      } else {
-        basePrice = parseFloat(tarifa.price) || 0;
-        debug.tarifa = {
-          encontrada: true,
-          id: tarifa.id,
-          origen: tarifa.origin,
-          destino: tarifa.destination,
-          rangoKg: `${tarifa.weight_from_kg}-${tarifa.weight_to_kg}`,
-          precioLista: basePrice,
-          queryUsada: tarifaDebug,
-        };
-      }
-
-      // Si hay tarifa especial que matchea, usarla
-      if (matchedSpecialTariff) {
-        const resultado = calcularPrecioEspecial(
-          matchedSpecialTariff,
-          cargo,
-          basePrice,
-          insuranceRate
-        );
-        price = resultado.price;
-        breakdown = resultado.breakdown;
-        specialTariffId = matchedSpecialTariff.id;
-        
-        debug.calculo = {
-          fleteLista: basePrice,
-          fleteConModificador: resultado.price,
-          valorDeclarado: cargo.declaredValue || 0,
-          tasaSeguro: insuranceRate,
-          seguro: breakdown.seguro || 0,
-          total: resultado.price,
-          formula: resultado.formula,
-        };
-      } else {
-        // Usar tarifa base con modificador comercial
-        breakdown.flete_lista = basePrice;
-        breakdown.peso_cobrado = pesoACobrar;
-        breakdown.tipo_tarifa = usaVolumen ? 2 : 0;
-        breakdown.delivery_type = deliveryType === 'domicilio' ? 1 : 0;
-        if (usaTonelaje) {
-          breakdown.es_tonelaje = 1;
-          breakdown.precio_por_kg = parseFloat(tarifa.price_per_kg) || 0;
-        }
-
-        let fleteConModificador = basePrice;
-        if (tariffModifier !== 0) {
-          const modificadorMonto = basePrice * (tariffModifier / 100);
-          breakdown.descuento = modificadorMonto;
-          fleteConModificador = basePrice + modificadorMonto;
-          debug.calculo.modificador = tariffModifier;
-        }
-        breakdown.flete_final = fleteConModificador;
-
-        let seguro = 0;
-        if (cargo.declaredValue && insuranceRate > 0) {
-          seguro = cargo.declaredValue * insuranceRate;
-          breakdown.seguro = seguro;
-        }
-
-        price = fleteConModificador + seguro;
-
-        // Debug del cálculo
-        const formulaBase = usaTonelaje 
-          ? `${pesoACobrar}kg × $${tarifa.price_per_kg}/kg = $${basePrice.toLocaleString()}`
-          : `$${basePrice.toLocaleString()} (flete ${tarifa.weight_to_kg || pesoACobrar}kg)`;
-        
-        debug.calculo = {
-          fleteLista: basePrice,
-          modificador: tariffModifier !== 0 ? tariffModifier : undefined,
-          fleteConModificador,
-          valorDeclarado: cargo.declaredValue || 0,
-          tasaSeguro: insuranceRate,
-          seguro,
-          total: price,
-          formula: tariffModifier !== 0 
-            ? `${formulaBase} ${tariffModifier > 0 ? '+' : ''}${tariffModifier}% = $${fleteConModificador.toLocaleString()} + $${seguro.toLocaleString()} (seguro ${(insuranceRate * 100).toFixed(1)}‰) = $${price.toLocaleString()}`
-            : `${formulaBase} + $${seguro.toLocaleString()} (seguro ${(insuranceRate * 1000).toFixed(0)}‰) = $${price.toLocaleString()}`,
-        };
-      }
+  if (tarifa) {
+    // PASO 2: Calcular IMPORTE por peso
+    let importePorPeso: number;
+    if (usaTonelaje) {
+      importePorPeso = pesoKg * (parseFloat(tarifa.price_per_kg) || 0);
+      debug.tarifa = {
+        encontrada: true,
+        id: tarifa.id,
+        origen: tarifa.origin,
+        destino: tarifa.destination,
+        rangoKg: `${tarifa.tonnage_from_kg}-${tarifa.tonnage_to_kg || '+'}kg (tonelaje)`,
+        precioLista: importePorPeso,
+        precioPorM3: precioPorM3 || undefined,
+        queryUsada: tarifaDebug,
+      };
     } else {
-      debug.tarifa.queryUsada = tarifaDebug;
+      importePorPeso = parseFloat(tarifa.price) || 0;
+      debug.tarifa = {
+        encontrada: true,
+        id: tarifa.id,
+        origen: tarifa.origin,
+        destino: tarifa.destination,
+        rangoKg: `${tarifa.weight_from_kg}-${tarifa.weight_to_kg}`,
+        precioLista: importePorPeso,
+        precioPorM3: precioPorM3 || undefined,
+        queryUsada: tarifaDebug,
+      };
     }
+
+    // PASO 3: REGLA DE ORO - Comparar IMPORTES
+    const comparacion = compararImportes(pesoKg, volumenM3, importePorPeso, precioPorM3 ?? null);
+    debug.comparacionImportes = {
+      pesoKg: comparacion.pesoKg,
+      volumenM3: comparacion.volumenM3,
+      importePorPeso: comparacion.importePorPeso,
+      importePorVolumen: comparacion.importePorVolumen,
+      precioPorM3: comparacion.precioPorM3,
+      criterioGanador: comparacion.criterioGanador,
+      explicacion: comparacion.explicacion,
+    };
+
+    const basePrice = comparacion.importeFinal;
+
+    // Si hay tarifa especial que matchea, usarla (override)
+    if (matchedSpecialTariff) {
+      const resultado = calcularPrecioEspecial(
+        matchedSpecialTariff,
+        cargo,
+        basePrice,
+        insuranceRate
+      );
+      price = resultado.price;
+      breakdown = resultado.breakdown;
+      specialTariffId = matchedSpecialTariff.id;
+      
+      debug.calculo = {
+        fleteLista: basePrice,
+        fleteConModificador: resultado.price,
+        valorDeclarado: cargo.declaredValue || 0,
+        tasaSeguro: insuranceRate,
+        seguro: breakdown.seguro || 0,
+        total: resultado.price,
+        formula: resultado.formula,
+      };
+    } else {
+      // Usar tarifa calculada con Regla de Oro + modificador comercial
+      breakdown.flete_lista = basePrice;
+      breakdown.criterio_usado = comparacion.criterioGanador === 'VOLUMEN' || comparacion.criterioGanador === 'SOLO_VOLUMEN' ? 1 : 0;
+      breakdown.peso_kg = pesoKg;
+      breakdown.volumen_m3 = volumenM3;
+      breakdown.importe_por_peso = comparacion.importePorPeso;
+      breakdown.importe_por_volumen = comparacion.importePorVolumen;
+      breakdown.delivery_type = deliveryType === 'domicilio' ? 1 : 0;
+      if (usaTonelaje) {
+        breakdown.es_tonelaje = 1;
+        breakdown.precio_por_kg = parseFloat(tarifa.price_per_kg) || 0;
+      }
+      if (precioPorM3) {
+        breakdown.precio_por_m3 = precioPorM3;
+      }
+
+      let fleteConModificador = basePrice;
+      if (tariffModifier !== 0) {
+        const modificadorMonto = basePrice * (tariffModifier / 100);
+        breakdown.descuento = modificadorMonto;
+        fleteConModificador = basePrice + modificadorMonto;
+        debug.calculo.modificador = tariffModifier;
+      }
+      breakdown.flete_final = fleteConModificador;
+
+      let seguro = 0;
+      if (cargo.declaredValue && insuranceRate > 0) {
+        seguro = cargo.declaredValue * insuranceRate;
+        breakdown.seguro = seguro;
+      }
+
+      price = fleteConModificador + seguro;
+
+      // Debug del cálculo con Regla de Oro
+      const criterioStr = comparacion.criterioGanador === 'VOLUMEN' || comparacion.criterioGanador === 'SOLO_VOLUMEN'
+        ? `${volumenM3}m³ × $${precioPorM3?.toLocaleString()}/m³ = $${basePrice.toLocaleString()} (VOLUMEN)`
+        : usaTonelaje 
+          ? `${pesoKg}kg × $${tarifa.price_per_kg}/kg = $${basePrice.toLocaleString()} (PESO-TONELAJE)`
+          : `Tarifa ${tarifa.weight_to_kg}kg = $${basePrice.toLocaleString()} (PESO)`;
+      
+      debug.calculo = {
+        fleteLista: basePrice,
+        modificador: tariffModifier !== 0 ? tariffModifier : undefined,
+        fleteConModificador,
+        valorDeclarado: cargo.declaredValue || 0,
+        tasaSeguro: insuranceRate,
+        seguro,
+        total: price,
+        formula: tariffModifier !== 0 
+          ? `${criterioStr} ${tariffModifier > 0 ? '+' : ''}${tariffModifier}% = $${fleteConModificador.toLocaleString()} + seguro $${seguro.toLocaleString()} = $${price.toLocaleString()}`
+          : `${criterioStr} + seguro $${seguro.toLocaleString()} = $${price.toLocaleString()}`,
+      };
+    }
+  } else {
+    debug.tarifa.queryUsada = tarifaDebug;
   }
 
   // Tag personalizado si aplica tarifa especial
@@ -712,6 +877,7 @@ async function handlePathB(
 }
 
 // CAMINO C: Doña Rosa - Tarifa General
+// Implementa la REGLA DE ORO: Comparación de IMPORTES (no de kilos)
 async function handlePathC(
   client: any | null,
   recipientName: string,
@@ -723,8 +889,8 @@ async function handlePathC(
   // Default a deposito para clientes sin tipo definido
   const deliveryType: 'deposito' | 'domicilio' = client?.delivery_type || 'deposito';
   
-  // Calcular peso a cobrar
-  const { pesoReal, pesoVolumetrico, pesoACobrar, usaVolumen, explicacion } = calcularPesoACobrar(cargo);
+  const pesoKg = cargo.weightKg || 0;
+  const volumenM3 = cargo.volumeM3 || 0;
   
   let price: number | null = null;
   let breakdown: Record<string, number> | undefined = undefined;
@@ -732,13 +898,14 @@ async function handlePathC(
   
   let debug: DebugInfo = {
     input: debugInput,
-    decision: {
-      pesoReal,
-      pesoVolumetrico,
-      factorConversion: VOLUMETRIC_FACTOR,
-      pesoACobrar,
-      criterioUsado: usaVolumen ? 'PESO_VOLUMETRICO' : 'PESO_REAL',
-      explicacion,
+    comparacionImportes: {
+      pesoKg,
+      volumenM3,
+      importePorPeso: 0,
+      importePorVolumen: 0,
+      precioPorM3: null,
+      criterioGanador: 'SIN_DATOS',
+      explicacion: '',
     },
     tarifa: { encontrada: false },
     calculo: {
@@ -752,109 +919,132 @@ async function handlePathC(
     },
   };
 
-  if (pesoACobrar > 0) {
-    const { tarifa, debug: tarifaDebug, usaTonelaje } = await buscarTarifa(
-      cargo.origin || 'Buenos Aires', 
-      cargo.destination || 'San Salvador de Jujuy', 
-      pesoACobrar,
-      deliveryType
-    );
+  // PASO 1: Buscar tarifa por PESO (usando peso real, no volumétrico)
+  const { tarifa, debug: tarifaDebug, usaTonelaje, precioPorM3 } = await buscarTarifa(
+    cargo.origin || 'Buenos Aires', 
+    cargo.destination || 'San Salvador de Jujuy', 
+    pesoKg > 0 ? pesoKg : 1, // Mínimo 1kg para buscar
+    deliveryType
+  );
 
-    if (tarifa) {
-      tariffId = tarifa.id;
-      
-      // Si es tarifa por tonelaje, calcular diferente
-      let basePrice: number;
-      if (usaTonelaje) {
-        basePrice = pesoACobrar * (parseFloat(tarifa.price_per_kg) || 0);
-        debug.tarifa = {
-          encontrada: true,
-          id: tarifa.id,
-          origen: tarifa.origin,
-          destino: tarifa.destination,
-          rangoKg: `${tarifa.tonnage_from_kg}-${tarifa.tonnage_to_kg || '+'}kg (tonelaje)`,
-          precioLista: basePrice,
-          queryUsada: tarifaDebug,
-        };
-      } else {
-        basePrice = parseFloat(tarifa.price) || 0;
-        debug.tarifa = {
-          encontrada: true,
-          id: tarifa.id,
-          origen: tarifa.origin,
-          destino: tarifa.destination,
-          rangoKg: `${tarifa.weight_from_kg}-${tarifa.weight_to_kg}`,
-          precioLista: basePrice,
-          queryUsada: tarifaDebug,
-        };
-      }
-      
-      breakdown = {
-        flete_lista: basePrice,
-        peso_cobrado: pesoACobrar,
-        tipo_tarifa: usaVolumen ? 2 : 0,
-        delivery_type: deliveryType === 'domicilio' ? 1 : 0,
-        flete_final: basePrice
-      };
-      
-      if (usaTonelaje) {
-        breakdown.es_tonelaje = 1;
-        breakdown.precio_por_kg = parseFloat(tarifa.price_per_kg) || 0;
-      }
-      
-      let seguro = 0;
-      if (cargo.declaredValue && cargo.declaredValue > 0) {
-        seguro = cargo.declaredValue * insuranceRate;
-        breakdown.seguro = seguro;
-      }
-      
-      price = basePrice + seguro;
-      
-      const formulaBase = usaTonelaje 
-        ? `${pesoACobrar}kg × $${tarifa.price_per_kg}/kg = $${basePrice.toLocaleString()}`
-        : `$${basePrice.toLocaleString()} (flete ${tarifa.weight_to_kg || pesoACobrar}kg)`;
-      
-      debug.calculo = {
-        fleteLista: basePrice,
-        fleteConModificador: basePrice,
-        valorDeclarado: cargo.declaredValue || 0,
-        tasaSeguro: insuranceRate,
-        seguro,
-        total: price,
-        formula: `${formulaBase} + $${seguro.toLocaleString()} (seguro ${(insuranceRate * 1000).toFixed(0)}‰) = $${price.toLocaleString()}`,
+  if (tarifa) {
+    tariffId = tarifa.id;
+    
+    // PASO 2: Calcular IMPORTE por peso
+    let importePorPeso: number;
+    if (usaTonelaje) {
+      importePorPeso = pesoKg * (parseFloat(tarifa.price_per_kg) || 0);
+      debug.tarifa = {
+        encontrada: true,
+        id: tarifa.id,
+        origen: tarifa.origin,
+        destino: tarifa.destination,
+        rangoKg: `${tarifa.tonnage_from_kg}-${tarifa.tonnage_to_kg || '+'}kg (tonelaje)`,
+        precioLista: importePorPeso,
+        precioPorM3: precioPorM3 || undefined,
+        queryUsada: tarifaDebug,
       };
     } else {
-      debug.tarifa.queryUsada = tarifaDebug;
-      
-      // Fallback: precio por kg
-      const precioPorKg = 500;
-      const basePrice = pesoACobrar * precioPorKg;
-      
-      breakdown = {
-        flete_lista: basePrice,
-        peso_cobrado: pesoACobrar,
-        tipo_tarifa: usaVolumen ? 2 : 0,
-        flete_final: basePrice
-      };
-      
-      let seguro = 0;
-      if (cargo.declaredValue && cargo.declaredValue > 0) {
-        seguro = cargo.declaredValue * insuranceRate;
-        breakdown.seguro = seguro;
-      }
-      
-      price = basePrice + seguro;
-      
-      debug.calculo = {
-        fleteLista: basePrice,
-        fleteConModificador: basePrice,
-        valorDeclarado: cargo.declaredValue || 0,
-        tasaSeguro: insuranceRate,
-        seguro,
-        total: price,
-        formula: `FALLBACK: ${pesoACobrar}kg × $${precioPorKg}/kg = $${basePrice.toLocaleString()} + $${seguro.toLocaleString()} (seguro) = $${price.toLocaleString()}`,
+      importePorPeso = parseFloat(tarifa.price) || 0;
+      debug.tarifa = {
+        encontrada: true,
+        id: tarifa.id,
+        origen: tarifa.origin,
+        destino: tarifa.destination,
+        rangoKg: `${tarifa.weight_from_kg}-${tarifa.weight_to_kg}`,
+        precioLista: importePorPeso,
+        precioPorM3: precioPorM3 || undefined,
+        queryUsada: tarifaDebug,
       };
     }
+    
+    // PASO 3: REGLA DE ORO - Comparar IMPORTES
+    const comparacion = compararImportes(pesoKg, volumenM3, importePorPeso, precioPorM3 ?? null);
+    debug.comparacionImportes = {
+      pesoKg: comparacion.pesoKg,
+      volumenM3: comparacion.volumenM3,
+      importePorPeso: comparacion.importePorPeso,
+      importePorVolumen: comparacion.importePorVolumen,
+      precioPorM3: comparacion.precioPorM3,
+      criterioGanador: comparacion.criterioGanador,
+      explicacion: comparacion.explicacion,
+    };
+
+    const basePrice = comparacion.importeFinal;
+    
+    breakdown = {
+      flete_lista: basePrice,
+      criterio_usado: comparacion.criterioGanador === 'VOLUMEN' || comparacion.criterioGanador === 'SOLO_VOLUMEN' ? 1 : 0,
+      peso_kg: pesoKg,
+      volumen_m3: volumenM3,
+      importe_por_peso: comparacion.importePorPeso,
+      importe_por_volumen: comparacion.importePorVolumen,
+      delivery_type: deliveryType === 'domicilio' ? 1 : 0,
+      flete_final: basePrice
+    };
+    
+    if (usaTonelaje) {
+      breakdown.es_tonelaje = 1;
+      breakdown.precio_por_kg = parseFloat(tarifa.price_per_kg) || 0;
+    }
+    if (precioPorM3) {
+      breakdown.precio_por_m3 = precioPorM3;
+    }
+    
+    let seguro = 0;
+    if (cargo.declaredValue && cargo.declaredValue > 0) {
+      seguro = cargo.declaredValue * insuranceRate;
+      breakdown.seguro = seguro;
+    }
+    
+    price = basePrice + seguro;
+    
+    // Debug del cálculo con Regla de Oro
+    const criterioStr = comparacion.criterioGanador === 'VOLUMEN' || comparacion.criterioGanador === 'SOLO_VOLUMEN'
+      ? `${volumenM3}m³ × $${precioPorM3?.toLocaleString()}/m³ = $${basePrice.toLocaleString()} (VOLUMEN)`
+      : usaTonelaje 
+        ? `${pesoKg}kg × $${tarifa.price_per_kg}/kg = $${basePrice.toLocaleString()} (PESO-TONELAJE)`
+        : `Tarifa ${tarifa.weight_to_kg}kg = $${basePrice.toLocaleString()} (PESO)`;
+    
+    debug.calculo = {
+      fleteLista: basePrice,
+      fleteConModificador: basePrice,
+      valorDeclarado: cargo.declaredValue || 0,
+      tasaSeguro: insuranceRate,
+      seguro,
+      total: price,
+      formula: `${criterioStr} + seguro $${seguro.toLocaleString()} = $${price.toLocaleString()}`,
+    };
+  } else {
+    debug.tarifa.queryUsada = tarifaDebug;
+    
+    // Fallback: precio por kg (sin comparación de importes porque no hay tarifa)
+    const precioPorKg = 500;
+    const basePrice = pesoKg * precioPorKg;
+    
+    breakdown = {
+      flete_lista: basePrice,
+      peso_kg: pesoKg,
+      flete_final: basePrice
+    };
+    
+    let seguro = 0;
+    if (cargo.declaredValue && cargo.declaredValue > 0) {
+      seguro = cargo.declaredValue * insuranceRate;
+      breakdown.seguro = seguro;
+    }
+    
+    price = basePrice + seguro;
+    
+    debug.calculo = {
+      fleteLista: basePrice,
+      fleteConModificador: basePrice,
+      valorDeclarado: cargo.declaredValue || 0,
+      tasaSeguro: insuranceRate,
+      seguro,
+      total: price,
+      formula: `FALLBACK: ${pesoKg}kg × $${precioPorKg}/kg = $${basePrice.toLocaleString()} + $${seguro.toLocaleString()} (seguro) = $${price.toLocaleString()}`,
+    };
   }
 
   return {

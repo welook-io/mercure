@@ -518,7 +518,8 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                   type="button"
                   onClick={() => {
                     setUseManualPrice(false);
-                    setManualPrice('');
+                    setManualFlete('');
+                    setManualSeguro('');
                   }}
                   className={`px-2 py-1 rounded ${!useManualPrice ? 'bg-neutral-200 text-neutral-700 font-medium' : 'hover:bg-neutral-100'}`}
                 >
@@ -577,12 +578,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                       <input
                         type="number"
                         value={manualFlete}
-                        onChange={(e) => {
-                          setManualFlete(e.target.value);
-                          const flete = parseFloat(e.target.value) || 0;
-                          const seguro = parseFloat(manualSeguro) || 0;
-                          setManualPrice((flete + seguro).toString());
-                        }}
+                        onChange={(e) => setManualFlete(e.target.value)}
                         placeholder="0.00"
                         className="w-full h-8 pl-6 pr-2 text-sm font-bold text-orange-800 border border-orange-300 rounded focus:border-orange-500 focus:ring-0 bg-white"
                         step="0.01"
@@ -597,12 +593,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                       <input
                         type="number"
                         value={manualSeguro}
-                        onChange={(e) => {
-                          setManualSeguro(e.target.value);
-                          const seguro = parseFloat(e.target.value) || 0;
-                          const flete = parseFloat(manualFlete) || 0;
-                          setManualPrice((flete + seguro).toString());
-                        }}
+                        onChange={(e) => setManualSeguro(e.target.value)}
                         placeholder="0.00"
                         className="w-full h-8 pl-6 pr-2 text-sm font-bold text-orange-800 border border-orange-300 rounded focus:border-orange-500 focus:ring-0 bg-white"
                         step="0.01"
@@ -618,8 +609,6 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                     onClick={() => {
                       const seguro = parseFloat(formData.declared_value) * 0.008;
                       setManualSeguro(seguro.toFixed(2));
-                      const flete = parseFloat(manualFlete) || 0;
-                      setManualPrice((flete + seguro).toString());
                     }}
                     className="text-xs text-orange-600 hover:text-orange-800 underline"
                   >
