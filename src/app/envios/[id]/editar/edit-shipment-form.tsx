@@ -127,6 +127,8 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
   const [pricingResult, setPricingResult] = useState<PricingResult | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [manualPrice, setManualPrice] = useState<string>('');
+  const [manualFlete, setManualFlete] = useState<string>('');
+  const [manualSeguro, setManualSeguro] = useState<string>('');
   const [useManualPrice, setUseManualPrice] = useState(false);
   
   // Estados para imágenes
@@ -307,14 +309,30 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
 
     try {
       // Si hay nueva cotización (automática o manual), prepararla
-      const finalPrice = useManualPrice && manualPrice 
-        ? parseFloat(manualPrice) 
+      const finalFlete = useManualPrice && manualFlete 
+        ? parseFloat(manualFlete) 
+        : (newQuotation?.breakdown?.flete_final || newQuotation?.breakdown?.flete_lista || 0);
+      
+      const finalSeguro = useManualPrice && manualSeguro 
+        ? parseFloat(manualSeguro) 
+        : (newQuotation?.breakdown?.seguro || 0);
+      
+      const finalPrice = useManualPrice 
+        ? (parseFloat(manualFlete) || 0) + (parseFloat(manualSeguro) || 0)
         : newQuotation?.price;
 
       const newQuotationData = finalPrice && finalPrice > 0 ? {
         price: finalPrice,
-        breakdown: newQuotation?.breakdown || {},
+        breakdown: useManualPrice 
+          ? { 
+              flete_lista: parseFloat(manualFlete) || 0,
+              flete_final: parseFloat(manualFlete) || 0,
+              seguro: parseFloat(manualSeguro) || 0,
+            }
+          : newQuotation?.breakdown || {},
         isManual: useManualPrice,
+        flete: finalFlete,
+        seguro: finalSeguro,
       } : null;
 
       const response = await fetch('/api/shipments', {
@@ -550,24 +568,76 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
               )}
             </div>
             
-            {/* Precio manual */}
+            {/* Precio manual - Flete y Seguro separados */}
             {useManualPrice ? (
               <div className="bg-orange-50 border border-orange-200 rounded p-2">
-                <label className="text-orange-700 text-xs block mb-1">Precio manual:</label>
-                <div className="relative">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-orange-400 text-sm">$</span>
-                  <input
-                    type="number"
-                    value={manualPrice}
-                    onChange={(e) => setManualPrice(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full h-8 pl-6 pr-2 text-sm font-bold text-orange-800 border border-orange-300 rounded focus:border-orange-500 focus:ring-0 bg-white"
-                    step="0.01"
-                    min="0"
-                  />
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div>
+                    <label className="text-orange-700 text-xs block mb-1">Flete:</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-orange-400 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={manualFlete}
+                        onChange={(e) => {
+                          setManualFlete(e.target.value);
+                          const flete = parseFloat(e.target.value) || 0;
+                          const seguro = parseFloat(manualSeguro) || 0;
+                          setManualPrice((flete + seguro).toString());
+                        }}
+                        placeholder="0.00"
+                        className="w-full h-8 pl-6 pr-2 text-sm font-bold text-orange-800 border border-orange-300 rounded focus:border-orange-500 focus:ring-0 bg-white"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-orange-700 text-xs block mb-1">Seguro:</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-orange-400 text-sm">$</span>
+                      <input
+                        type="number"
+                        value={manualSeguro}
+                        onChange={(e) => {
+                          setManualSeguro(e.target.value);
+                          const seguro = parseFloat(e.target.value) || 0;
+                          const flete = parseFloat(manualFlete) || 0;
+                          setManualPrice((flete + seguro).toString());
+                        }}
+                        placeholder="0.00"
+                        className="w-full h-8 pl-6 pr-2 text-sm font-bold text-orange-800 border border-orange-300 rounded focus:border-orange-500 focus:ring-0 bg-white"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                  </div>
                 </div>
-                {manualPrice && parseFloat(manualPrice) > 0 && (
-                  <p className="text-xs text-orange-600 mt-1">Se guardará al confirmar</p>
+                {/* Calcular seguro automáticamente */}
+                {formData.declared_value && parseFloat(formData.declared_value) > 0 && !manualSeguro && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const seguro = parseFloat(formData.declared_value) * 0.008;
+                      setManualSeguro(seguro.toFixed(2));
+                      const flete = parseFloat(manualFlete) || 0;
+                      setManualPrice((flete + seguro).toString());
+                    }}
+                    className="text-xs text-orange-600 hover:text-orange-800 underline"
+                  >
+                    Calcular seguro (8‰ = ${(parseFloat(formData.declared_value) * 0.008).toLocaleString('es-AR', { minimumFractionDigits: 2 })})
+                  </button>
+                )}
+                {(manualFlete || manualSeguro) && (
+                  <div className="mt-2 pt-2 border-t border-orange-200">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-orange-600">Total:</span>
+                      <span className="font-bold text-orange-800">
+                        ${((parseFloat(manualFlete) || 0) + (parseFloat(manualSeguro) || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-orange-600 mt-1">Se guardará al confirmar</p>
+                  </div>
                 )}
               </div>
             ) : newQuotation ? (
@@ -576,7 +646,14 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                 <p className="font-bold text-green-800">
                   ${newQuotation.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                 </p>
-                <p className="text-xs text-green-600">Se guardará al confirmar</p>
+                {/* Mostrar breakdown de flete y seguro */}
+                {(newQuotation.breakdown?.flete_final || newQuotation.breakdown?.flete_lista || newQuotation.breakdown?.seguro) && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Flete: ${(newQuotation.breakdown.flete_final || newQuotation.breakdown.flete_lista || 0).toLocaleString('es-AR')}
+                    {newQuotation.breakdown.seguro > 0 && ` + Seguro: $${newQuotation.breakdown.seguro.toLocaleString('es-AR')}`}
+                  </p>
+                )}
+                <p className="text-xs text-green-600 mt-1">Se guardará al confirmar</p>
               </div>
             ) : null}
           </div>
