@@ -121,15 +121,61 @@ export async function PATCH(
 
       // Si es cliente nuevo, crearlo
       if (!entityId && agreement.new_entity_name) {
+        // =========================================================
+        // VALIDACIÓN DE DUPLICADOS
+        // =========================================================
+        
+        // 1. Verificar si ya existe una entidad con el mismo CUIT
+        if (agreement.new_entity_cuit && agreement.new_entity_cuit.trim() !== '') {
+          const normalizedCuit = agreement.new_entity_cuit.replace(/[-\s]/g, '').trim();
+          
+          const { data: existingByCuit } = await supabase
+            .schema('mercure')
+            .from('entities')
+            .select('id, legal_name, tax_id')
+            .or(`tax_id.eq.${normalizedCuit},tax_id.eq.${agreement.new_entity_cuit.trim()}`)
+            .limit(1);
+          
+          if (existingByCuit && existingByCuit.length > 0) {
+            const existing = existingByCuit[0];
+            return NextResponse.json({ 
+              error: `Ya existe un cliente con este CUIT: "${existing.legal_name}" (${existing.tax_id}). Puede vincular el acuerdo a ese cliente existente.`,
+              duplicate: true,
+              existingEntity: existing
+            }, { status: 409 });
+          }
+        }
+
+        // 2. Verificar si ya existe una entidad con nombre exacto
+        const normalizedName = agreement.new_entity_name.trim().toLowerCase();
+        const { data: existingByName } = await supabase
+          .schema('mercure')
+          .from('entities')
+          .select('id, legal_name, tax_id')
+          .ilike('legal_name', normalizedName);
+        
+        if (existingByName && existingByName.length > 0) {
+          const existing = existingByName[0];
+          return NextResponse.json({ 
+            error: `Ya existe un cliente con este nombre: "${existing.legal_name}"${existing.tax_id ? ` (CUIT: ${existing.tax_id})` : ''}. Puede vincular el acuerdo a ese cliente existente.`,
+            duplicate: true,
+            existingEntity: existing
+          }, { status: 409 });
+        }
+
+        // =========================================================
+        // CREAR CLIENTE (si no hay duplicados)
+        // =========================================================
+        
         const { data: newEntity, error: createError } = await supabase
           .schema('mercure').from('entities')
           .insert({
-            legal_name: agreement.new_entity_name,
-            tax_id: agreement.new_entity_cuit,
-            address: agreement.new_entity_address,
-            phone: agreement.new_entity_phone,
-            email: agreement.new_entity_email,
-            contact_name: agreement.new_entity_contact_name,
+            legal_name: agreement.new_entity_name.trim(),
+            tax_id: agreement.new_entity_cuit?.trim() || null,
+            address: agreement.new_entity_address?.trim() || null,
+            phone: agreement.new_entity_phone?.trim() || null,
+            email: agreement.new_entity_email?.trim() || null,
+            contact_name: agreement.new_entity_contact_name?.trim() || null,
             entity_type: 'cliente',
             payment_terms: agreement.requested_credit_terms,
             // Trazabilidad
@@ -217,6 +263,10 @@ export async function PATCH(
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
+
+
+
+
 
 
 

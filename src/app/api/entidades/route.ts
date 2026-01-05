@@ -189,20 +189,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Razón Social es requerida' }, { status: 400 });
     }
 
-    // Crear entidad
+    // =========================================================
+    // VALIDACIÓN DE DUPLICADOS
+    // =========================================================
+    
+    // 1. Verificar si ya existe una entidad con el mismo CUIT
+    if (body.tax_id && body.tax_id.trim() !== '') {
+      const normalizedCuit = body.tax_id.replace(/[-\s]/g, '').trim();
+      
+      const { data: existingByCuit } = await supabaseAdmin
+        .schema('mercure')
+        .from('entities')
+        .select('id, legal_name, tax_id')
+        .or(`tax_id.eq.${normalizedCuit},tax_id.eq.${body.tax_id.trim()}`)
+        .limit(1);
+      
+      if (existingByCuit && existingByCuit.length > 0) {
+        const existing = existingByCuit[0];
+        return NextResponse.json({ 
+          error: `Ya existe una entidad con este CUIT: "${existing.legal_name}" (${existing.tax_id})`,
+          duplicate: true,
+          existingEntity: existing
+        }, { status: 409 }); // 409 Conflict
+      }
+    }
+
+    // 2. Verificar si ya existe una entidad con nombre muy similar
+    const normalizedName = body.legal_name.trim().toLowerCase();
+    const { data: existingByName } = await supabaseAdmin
+      .schema('mercure')
+      .from('entities')
+      .select('id, legal_name, tax_id')
+      .ilike('legal_name', normalizedName);
+    
+    if (existingByName && existingByName.length > 0) {
+      const existing = existingByName[0];
+      return NextResponse.json({ 
+        error: `Ya existe una entidad con este nombre: "${existing.legal_name}"${existing.tax_id ? ` (CUIT: ${existing.tax_id})` : ''}`,
+        duplicate: true,
+        existingEntity: existing
+      }, { status: 409 }); // 409 Conflict
+    }
+
+    // =========================================================
+    // CREAR ENTIDAD (si no hay duplicados)
+    // =========================================================
+    
     const { data: newEntity, error: insertError } = await supabaseAdmin
       .schema('mercure')
       .from('entities')
       .insert({
-        legal_name: body.legal_name,
-        tax_id: body.tax_id || null,
+        legal_name: body.legal_name.trim(),
+        tax_id: body.tax_id?.trim() || null,
         entity_type: body.entity_type || null,
         payment_terms: body.payment_terms || null,
         delivery_type: body.delivery_type || 'deposito',
-        email: body.email || null,
-        phone: body.phone || null,
-        address: body.address || null,
-        notes: body.notes || null,
+        email: body.email?.trim() || null,
+        phone: body.phone?.trim() || null,
+        address: body.address?.trim() || null,
+        notes: body.notes?.trim() || null,
       })
       .select()
       .single();
