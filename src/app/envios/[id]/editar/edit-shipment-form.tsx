@@ -213,12 +213,13 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
       // Guardar resultado completo para mostrar debug
       setPricingResult(result);
       
-      if (result.pricing?.price > 0) {
+      const precio = result.pricing?.price ?? 0;
+      if (precio > 0) {
         setNewQuotation({
-          price: result.pricing.price,
-          breakdown: result.pricing.breakdown || {},
+          price: precio,
+          breakdown: result.pricing?.breakdown || {},
         });
-        setMessage({ type: 'success', text: `Nuevo precio: $${result.pricing.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` });
+        setMessage({ type: 'success', text: `Nuevo precio: $${precio.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` });
         // Mostrar panel de debug automáticamente
         setShowDebugPanel(true);
       } else {
@@ -562,7 +563,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
               </p>
               {quotation && (
                 <p className="text-xs text-neutral-400">
-                  Flete: ${quotation.base_price.toLocaleString('es-AR')} + Seguro: ${quotation.insurance_cost.toLocaleString('es-AR')}{quotation.pickup_fee > 0 && ` + Retiro: $${quotation.pickup_fee.toLocaleString('es-AR')}`}
+                  Flete: ${(quotation.base_price ?? 0).toLocaleString('es-AR')} + Seguro: ${(quotation.insurance_cost ?? 0).toLocaleString('es-AR')}{(quotation.pickup_fee ?? 0) > 0 && ` + Retiro: $${(quotation.pickup_fee ?? 0).toLocaleString('es-AR')}`}
                 </p>
               )}
             </div>
@@ -635,10 +636,10 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                   ${newQuotation.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                 </p>
                 {/* Mostrar breakdown de flete y seguro */}
-                {(newQuotation.breakdown?.flete_final || newQuotation.breakdown?.flete_lista || newQuotation.breakdown?.seguro) && (
+                {newQuotation.breakdown && (newQuotation.breakdown.flete_final || newQuotation.breakdown.flete_lista || newQuotation.breakdown.seguro) && (
                   <p className="text-xs text-green-600 mt-1">
                     Flete: ${(newQuotation.breakdown.flete_final || newQuotation.breakdown.flete_lista || 0).toLocaleString('es-AR')}
-                    {newQuotation.breakdown.seguro > 0 && ` + Seguro: $${newQuotation.breakdown.seguro.toLocaleString('es-AR')}`}
+                    {(newQuotation.breakdown.seguro ?? 0) > 0 && ` + Seguro: $${(newQuotation.breakdown.seguro ?? 0).toLocaleString('es-AR')}`}
                   </p>
                 )}
                 <p className="text-xs text-green-600 mt-1">Se guardará al confirmar</p>
