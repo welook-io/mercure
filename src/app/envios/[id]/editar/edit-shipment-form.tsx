@@ -115,6 +115,23 @@ interface PricingResult {
 
 export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) {
   const router = useRouter();
+  
+  // Validación de datos del envío
+  if (!shipment || typeof shipment.id !== 'number') {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700">
+        <p className="font-medium">Error: Datos del envío inválidos</p>
+        <p className="text-sm mt-1">No se pudo cargar la información del envío. Por favor, vuelva a la lista de envíos.</p>
+        <button 
+          onClick={() => router.push('/envios')}
+          className="mt-3 h-8 px-4 text-sm bg-red-600 hover:bg-red-700 text-white rounded"
+        >
+          Volver a Envíos
+        </button>
+      </div>
+    );
+  }
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isQuoting, setIsQuoting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
