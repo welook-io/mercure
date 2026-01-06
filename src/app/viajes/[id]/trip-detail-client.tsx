@@ -590,7 +590,8 @@ export function TripDetailClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-neutral-50 border-b border-neutral-200">
-                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Guía</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Guía Kalia</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remito</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remitente</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Destinatario</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-neutral-500 uppercase">Peso</th>
@@ -604,7 +605,7 @@ export function TripDetailClient({
             <tbody>
               {shipments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-neutral-400">
+                  <td colSpan={8} className="px-3 py-8 text-center text-neutral-400">
                     No hay guías. Usá <strong>"Asignar Guías"</strong> para agregar guías existentes.
                   </td>
                 </tr>
@@ -614,7 +615,10 @@ export function TripDetailClient({
                   const recipient = Array.isArray(s.recipient) ? s.recipient[0] : s.recipient;
                   return (
                     <tr key={s.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
-                      <td className="px-3 py-2 font-mono text-xs">{s.delivery_note_number}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-orange-600 font-medium whitespace-nowrap">
+                        R0005-{String(s.id).padStart(8, '0')}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs">{s.delivery_note_number || '-'}</td>
                       <td className="px-3 py-2 text-neutral-700 text-xs">{sender?.legal_name || '-'}</td>
                       <td className="px-3 py-2 text-neutral-600 text-xs">{recipient?.legal_name || '-'}</td>
                       <td className="px-3 py-2 text-right text-neutral-600 text-xs">{s.weight_kg ? `${s.weight_kg} kg` : '-'}</td>
@@ -689,7 +693,12 @@ export function TripDetailClient({
                             {selectedShipmentIds.includes(s.id) && <Check className="w-3 h-3" />}
                           </div>
                           <div>
-                            <p className="font-mono text-sm font-medium">{s.delivery_note_number}</p>
+                            <p className="font-mono text-sm font-medium text-orange-600">
+                              R0005-{String(s.id).padStart(8, '0')}
+                            </p>
+                            <p className="text-xs text-neutral-600">
+                              Remito: {s.delivery_note_number || '-'}
+                            </p>
                             <p className="text-xs text-neutral-500">
                               {s.sender_name || 'Sin remitente'} → {s.recipient_name || 'Sin destinatario'}
                             </p>

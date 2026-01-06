@@ -476,6 +476,7 @@ export function ShipmentList({ shipments, totalCount, currentPage, pageSize, fil
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-neutral-50 border-b border-neutral-200">
+                <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Guía</th>
                 <th className="px-2 py-2 text-center text-xs font-medium text-neutral-500 uppercase w-16">Fotos</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remito</th>
                 <th 
@@ -530,6 +531,9 @@ export function ShipmentList({ shipments, totalCount, currentPage, pageSize, fil
             <tbody>
               {sortedShipments.map((s) => (
                 <tr key={s.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
+                  <td className="px-3 py-2 font-mono text-xs text-orange-600 font-medium whitespace-nowrap">
+                    R0005-{String(s.id).padStart(8, '0')}
+                  </td>
                   <td className="px-2 py-1">
                     <div className="flex items-center justify-center gap-1">
                       {s.remito_image_url ? (
@@ -603,7 +607,7 @@ export function ShipmentList({ shipments, totalCount, currentPage, pageSize, fil
             </tbody>
             <tfoot>
               <tr className="bg-neutral-100 border-t border-neutral-300">
-                <td colSpan={10} className="px-3 py-2 text-right text-sm font-bold text-neutral-700">
+                <td colSpan={11} className="px-3 py-2 text-right text-sm font-bold text-neutral-700">
                   TOTAL FLETE (página)
                 </td>
                 <td className="px-3 py-2 text-right text-sm font-bold text-neutral-900">

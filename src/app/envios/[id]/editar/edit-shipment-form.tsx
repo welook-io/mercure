@@ -603,16 +603,17 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                   </div>
                 </div>
                 {/* Calcular seguro automáticamente */}
-                {formData.declared_value && parseFloat(formData.declared_value) > 0 && !manualSeguro && (
+                {formData.declared_value && !isNaN(parseFloat(formData.declared_value)) && parseFloat(formData.declared_value) > 0 && !manualSeguro && (
                   <button
                     type="button"
                     onClick={() => {
-                      const seguro = parseFloat(formData.declared_value) * 0.008;
+                      const declaredVal = parseFloat(formData.declared_value) || 0;
+                      const seguro = declaredVal * 0.008;
                       setManualSeguro(seguro.toFixed(2));
                     }}
                     className="text-xs text-orange-600 hover:text-orange-800 underline"
                   >
-                    Calcular seguro (8‰ = ${(parseFloat(formData.declared_value) * 0.008).toLocaleString('es-AR', { minimumFractionDigits: 2 })})
+                    Calcular seguro (8‰ = ${((parseFloat(formData.declared_value) || 0) * 0.008).toLocaleString('es-AR', { minimumFractionDigits: 2 })})
                   </button>
                 )}
                 {(manualFlete || manualSeguro) && (
