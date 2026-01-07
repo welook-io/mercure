@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
     // Procesar respuesta
     let assistantMessage = "";
     let ticketCreated = null;
-    let toolCalls: unknown[] = [];
+    const toolCalls: unknown[] = [];
 
     for (const block of response.content) {
       if (block.type === "text") {

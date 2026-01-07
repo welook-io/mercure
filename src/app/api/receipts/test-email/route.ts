@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Intentar con sendReceiptEmail primero, luego fallback a env var
-    let result = await sendReceiptEmail({
+    const result = await sendReceiptEmail({
       to: body.email,
       clientName: body.receipt.clientName,
       receiptNumber: body.receipt.receiptNumber,

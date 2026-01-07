@@ -619,7 +619,7 @@ async function handlePathA(
   let specialTariffId: number | undefined = undefined;
   
   // Inicializar debug con valores por defecto
-  let debug: DebugInfo = {
+  const debug: DebugInfo = {
     input: debugInput,
     comparacionImportes: {
       pesoKg,
@@ -896,7 +896,7 @@ async function handlePathC(
   let breakdown: Record<string, number> | undefined = undefined;
   let tariffId: number | undefined = undefined;
   
-  let debug: DebugInfo = {
+  const debug: DebugInfo = {
     input: debugInput,
     comparacionImportes: {
       pesoKg,
@@ -1214,7 +1214,7 @@ function calcularPrecioEspecial(
 ): { price: number; breakdown: Record<string, number>; formula: string } {
   const pv = specialTariff.pricing_values || {};
   let price = 0;
-  let breakdown: Record<string, number> = {};
+  const breakdown: Record<string, number> = {};
   let formula = '';
   
   // Usar tasa de seguro específica si está definida, si es 0 es sin seguro
@@ -1357,7 +1357,7 @@ function calcularPrecioEspecial(
 // Evaluar fórmula simple con kg y m3
 function evaluarFormulaSimple(formula: string, kg: number, m3: number): number {
   // Reemplazar variables
-  let expr = formula
+  const expr = formula
     .toLowerCase()
     .replace(/kg/g, String(kg))
     .replace(/m3/g, String(m3))

@@ -2,7 +2,7 @@
 
 import { Printer, ArrowLeft } from "lucide-react";
 import { RemitoDuplex } from "@/components/documents/remito-duplex";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
 interface ShipmentData {
@@ -47,11 +47,8 @@ interface RemitoPreviewClientProps {
 }
 
 export function RemitoPreviewClient({ shipment }: RemitoPreviewClientProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Inicializar mounted en true directamente para evitar setState en effect
+  const [mounted] = useState(true);
 
   const handlePrint = () => {
     const originalTitle = document.title;

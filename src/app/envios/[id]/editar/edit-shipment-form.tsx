@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Loader2, Calculator, Trash2, Upload, Image as ImageIcon, X, ChevronDown, ChevronUp, Info } from "lucide-react";
 
@@ -118,22 +118,7 @@ interface PricingResult {
 export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) {
   const router = useRouter();
   
-  // Validación de datos del envío
-  if (!shipment || typeof shipment.id !== 'number') {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700">
-        <p className="font-medium">Error: Datos del envío inválidos</p>
-        <p className="text-sm mt-1">No se pudo cargar la información del envío. Por favor, vuelva a la lista de envíos.</p>
-        <button 
-          onClick={() => router.push('/envios')}
-          className="mt-3 h-8 px-4 text-sm bg-red-600 hover:bg-red-700 text-white rounded"
-        >
-          Volver a Envíos
-        </button>
-      </div>
-    );
-  }
-  
+  // Todos los hooks deben estar antes de cualquier early return
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isQuoting, setIsQuoting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -150,54 +135,31 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
   
   // Estados para imágenes (ahora soporta múltiples)
   const [remitoImageUrls, setRemitoImageUrls] = useState<string[]>(
-    shipment.remito_image_urls?.length ? shipment.remito_image_urls : 
-    (shipment.remito_image_url ? [shipment.remito_image_url] : [])
+    shipment?.remito_image_urls?.length ? shipment.remito_image_urls : 
+    (shipment?.remito_image_url ? [shipment.remito_image_url] : [])
   );
   const [cargoImageUrls, setCargoImageUrls] = useState<string[]>(
-    shipment.cargo_image_urls?.length ? shipment.cargo_image_urls :
-    (shipment.cargo_image_url ? [shipment.cargo_image_url] : [])
+    shipment?.cargo_image_urls?.length ? shipment.cargo_image_urls :
+    (shipment?.cargo_image_url ? [shipment.cargo_image_url] : [])
   );
   const [imageModal, setImageModal] = useState<{ url: string; title: string } | null>(null);
   const remitoInputRef = useRef<HTMLInputElement>(null);
   const cargoInputRef = useRef<HTMLInputElement>(null);
   
-  // Cargar cotización existente
-  useEffect(() => {
-    async function loadQuotation() {
-      if (shipment.quotation_id) {
-        try {
-          const response = await fetch(`/api/shipments?quotationId=${shipment.quotation_id}`);
-          const result = await response.json();
-          if (result.quotation) {
-            setQuotation({
-              total_price: Number(result.quotation.total_price),
-              base_price: Number(result.quotation.base_price),
-              insurance_cost: Number(result.quotation.insurance_cost),
-              pickup_fee: Number(result.quotation.pickup_fee) || 0,
-            });
-          }
-        } catch (error) {
-          console.error('Error loading quotation:', error);
-        }
-      }
-    }
-    loadQuotation();
-  }, [shipment.quotation_id]);
-  
   const [formData, setFormData] = useState({
-    delivery_note_number: shipment.delivery_note_number || '',
-    sender_id: shipment.sender_id?.toString() || '',
-    recipient_id: shipment.recipient_id?.toString() || '',
-    recipient_address: shipment.recipient_address || '',
-    package_quantity: shipment.package_quantity?.toString() || '',
-    weight_kg: shipment.weight_kg?.toString() || '',
-    volume_m3: shipment.volume_m3?.toString() || '',
-    declared_value: shipment.declared_value?.toString() || '',
-    pickup_fee: shipment.pickup_fee?.toString() || '',
-    load_description: shipment.load_description || '',
-    paid_by: shipment.paid_by || 'destino',
-    payment_terms: shipment.payment_terms || 'contado',
-    notes: shipment.notes || '',
+    delivery_note_number: shipment?.delivery_note_number || '',
+    sender_id: shipment?.sender_id?.toString() || '',
+    recipient_id: shipment?.recipient_id?.toString() || '',
+    recipient_address: shipment?.recipient_address || '',
+    package_quantity: shipment?.package_quantity?.toString() || '',
+    weight_kg: shipment?.weight_kg?.toString() || '',
+    volume_m3: shipment?.volume_m3?.toString() || '',
+    declared_value: shipment?.declared_value?.toString() || '',
+    pickup_fee: shipment?.pickup_fee?.toString() || '',
+    load_description: shipment?.load_description || '',
+    paid_by: shipment?.paid_by || 'destino',
+    payment_terms: shipment?.payment_terms || 'contado',
+    notes: shipment?.notes || '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

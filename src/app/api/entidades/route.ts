@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const fields = searchParams.get('fields') || 'id, legal_name, tax_id, entity_type, payment_terms, email, phone, address';
     const withBalances = searchParams.get('withBalances') === 'true';
 
-    let query = supabaseAdmin
+    const query = supabaseAdmin
       .schema('mercure')
       .from('entities');
 

@@ -5,7 +5,7 @@ import { RemitoDocument } from "@/components/documents/remito";
 import { RemitoDocumentV2 } from "@/components/documents/remito-v2";
 import { GuiaDocument } from "@/components/documents/guia";
 import { ReciboDocument } from "@/components/documents/recibo";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface RemitoPreviewProps {
   shipment: {
@@ -135,14 +135,11 @@ const mockRecibo = {
 };
 
 export function RemitoPreview({ shipment }: RemitoPreviewProps) {
-  const [mounted, setMounted] = useState(false);
+  // Inicializar mounted en true directamente para evitar setState en effect
+  const [mounted] = useState(true);
   const [version, setVersion] = useState<'v1' | 'v2'>('v2');
   const [testCtaCte, setTestCtaCte] = useState(false);
   const [docType, setDocType] = useState<'remito' | 'guia' | 'recibo'>('remito');
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handlePrint = () => {
     // Cambiar título para que el PDF se descargue con el nombre correcto

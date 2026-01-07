@@ -309,7 +309,7 @@ export default function AcuerdoDetallePage() {
 
               {agreement.review_notes && (
                 <div className="ml-6 p-2 bg-neutral-50 rounded text-xs text-neutral-600 italic">
-                  "{agreement.review_notes}"
+                  &quot;{agreement.review_notes}&quot;
                 </div>
               )}
 

@@ -153,7 +153,7 @@ export function FacturaTestClient({ cliente, liquidacion }: FacturaTestClientPro
           </h2>
         </div>
         <div className="p-4">
-          <p className="text-sm text-neutral-600 mb-4 italic">"{liquidacion.descripcion}"</p>
+          <p className="text-sm text-neutral-600 mb-4 italic">&quot;{liquidacion.descripcion}&quot;</p>
           
           <div className="space-y-2 text-sm">
             <div className="flex justify-between py-1">

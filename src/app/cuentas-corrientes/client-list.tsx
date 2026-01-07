@@ -42,6 +42,35 @@ function formatDate(date: string | null): string {
   });
 }
 
+// Componente SortButton movido fuera del componente para evitar recreación en cada render
+function SortButton({ 
+  field, 
+  children, 
+  sortField, 
+  sortDir, 
+  onSort 
+}: { 
+  field: SortField; 
+  children: React.ReactNode;
+  sortField: SortField;
+  sortDir: SortDir;
+  onSort: (field: SortField) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSort(field)}
+      className={`flex items-center gap-1 text-xs uppercase tracking-wide transition-colors ${
+        sortField === field ? 'text-neutral-900 font-medium' : 'text-neutral-500 hover:text-neutral-700'
+      }`}
+    >
+      {children}
+      {sortField === field && (
+        <ArrowUpDown className={`w-3 h-3 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+      )}
+    </button>
+  );
+}
+
 export function ClientList({ initialClients }: ClientListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedClient, setExpandedClient] = useState<number | null>(null);
@@ -97,20 +126,6 @@ export function ClientList({ initialClients }: ClientListProps) {
   const toggleClient = (clientId: number) => {
     setExpandedClient(expandedClient === clientId ? null : clientId);
   };
-
-  const SortButton = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <button
-      onClick={() => handleSort(field)}
-      className={`flex items-center gap-1 text-xs uppercase tracking-wide transition-colors ${
-        sortField === field ? 'text-neutral-900 font-medium' : 'text-neutral-500 hover:text-neutral-700'
-      }`}
-    >
-      {children}
-      {sortField === field && (
-        <ArrowUpDown className={`w-3 h-3 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
-      )}
-    </button>
-  );
 
   return (
     <div className="space-y-3">
@@ -169,14 +184,14 @@ export function ClientList({ initialClients }: ClientListProps) {
         <div className="bg-neutral-50 border-b border-neutral-200 grid grid-cols-12 gap-2 px-3 py-2">
           <div className="col-span-1"></div>
           <div className="col-span-4">
-            <SortButton field="name">Cliente</SortButton>
+            <SortButton field="name" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Cliente</SortButton>
           </div>
           <div className="col-span-2 text-xs text-neutral-500 uppercase tracking-wide">CUIT</div>
           <div className="col-span-1 text-center">
-            <SortButton field="shipments">Remitos</SortButton>
+            <SortButton field="shipments" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Remitos</SortButton>
           </div>
           <div className="col-span-2 text-right">
-            <SortButton field="balance">Saldo</SortButton>
+            <SortButton field="balance" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Saldo</SortButton>
           </div>
           <div className="col-span-2 text-right text-xs text-neutral-500 uppercase tracking-wide">Últ. Liq.</div>
         </div>
