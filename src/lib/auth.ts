@@ -18,8 +18,8 @@ const mercure = () => supabase.schema('mercure');
 
 // Obtener permisos del usuario desde user_permissions
 export async function getUserPermissions(userId: string): Promise<UserPermissions> {
-  const { data, error } = await supabase
-    .from('mercure_user_permissions')
+  const { data, error } = await mercure()
+    .from('user_permissions')
     .select('permission, has_access')
     .eq('user_id', userId)
     .eq('has_access', true);
@@ -62,8 +62,8 @@ export async function hasAccess(userId: string, email?: string | null): Promise<
   }
 
   // Verificar si tiene al menos un permiso activo
-  const { data: permData } = await supabase
-    .from("mercure_user_permissions")
+  const { data: permData } = await mercure()
+    .from("user_permissions")
     .select("permission")
     .eq("user_id", supabaseUserId)
     .eq("has_access", true)
@@ -175,8 +175,8 @@ export async function requirePermission(permission: Permission) {
 
 export async function getUserRole(userId: string): Promise<string | null> {
   // Buscar el rol del usuario en user_roles (legacy)
-  const { data, error } = await supabase
-    .from('mercure_user_roles')
+  const { data, error } = await mercure()
+    .from('user_roles')
     .select('role')
     .eq('user_id', userId)
     .eq('is_active', true)
@@ -216,8 +216,8 @@ export async function getCurrentUserRole(): Promise<{ role: string | null; email
   }
 
   // Buscar rol en user_roles (legacy)
-  const { data: roleData } = await supabase
-    .from("mercure_user_roles")
+  const { data: roleData } = await mercure()
+    .from("user_roles")
     .select("role")
     .eq("user_id", userData[0].id)
     .eq("is_active", true)

@@ -21,7 +21,8 @@ export async function GET() {
       
       // Usuarios con rol chofer
       supabaseAdmin!
-        .from("mercure_user_roles")
+        .schema("mercure")
+        .from("user_roles")
         .select(`
           id,
           role,

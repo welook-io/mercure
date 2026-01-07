@@ -49,7 +49,8 @@ async function getUsersWithPermissions(): Promise<UserWithPermissions[]> {
   try {
     // Traer todos los permisos activos
     const { data: permissionsData, error: permError } = await supabaseAdmin
-      .from("mercure_user_permissions")
+      .schema("mercure")
+      .from("user_permissions")
       .select("user_id, permission, has_access")
       .eq("has_access", true);
 
@@ -155,7 +156,8 @@ async function getAuditLogs(limit = 1000): Promise<AuditLog[]> {
 
   try {
     const { data, error } = await supabaseAdmin
-      .from("mercure_audit_logs")
+      .schema("mercure")
+      .from("audit_logs")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -198,7 +200,8 @@ export default async function ConfiguracionPage() {
 
     // Verificar permiso de configuración
     const { data: configPerm } = await supabaseAdmin
-      .from("mercure_user_permissions")
+      .schema("mercure")
+      .from("user_permissions")
       .select("has_access")
       .eq("user_id", supabaseUserId)
       .eq("permission", "configuracion")

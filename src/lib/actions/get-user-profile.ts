@@ -29,9 +29,10 @@ export async function getUserProfileAction(): Promise<UserProfileResult> {
 
     const supabaseUserId = usersData[0].id;
 
-    // Buscar el rol en mercure_user_roles (schema public)
+    // Buscar el rol en user_roles (schema mercure)
     const { data: rolesData, error: roleError } = await supabaseAdmin
-      .from("mercure_user_roles")
+      .schema("mercure")
+      .from("user_roles")
       .select("role")
       .eq("user_id", supabaseUserId)
       .eq("is_active", true)

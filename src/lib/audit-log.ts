@@ -125,7 +125,7 @@ export async function logAudit(params: AuditLogParams): Promise<void> {
     }
 
     // Insertar el log
-    const { error } = await supabaseAdmin.from("mercure_audit_logs").insert({
+    const { error } = await supabaseAdmin.schema("mercure").from("audit_logs").insert({
       user_id: dbUserId,
       user_email: userEmail,
       user_name: userName,

@@ -47,7 +47,8 @@ export async function updateUserPermission(
 
     // Upsert del permiso
     const { error } = await supabaseAdmin
-      .from("mercure_user_permissions")
+      .schema("mercure")
+      .from("user_permissions")
       .upsert(
         {
           user_id: userId,
@@ -111,7 +112,8 @@ export async function updateUserPermissions(
 
     // Upsert todos los permisos
     const { error } = await supabaseAdmin
-      .from("mercure_user_permissions")
+      .schema("mercure")
+      .from("user_permissions")
       .upsert(permissionsToUpsert, {
         onConflict: "user_id,permission",
       });
@@ -244,7 +246,8 @@ export async function removeUserFromOrg(userId: string, targetEmail: string) {
 
     // Poner todos los permisos en false
     const { error } = await supabaseAdmin
-      .from("mercure_user_permissions")
+      .schema("mercure")
+      .from("user_permissions")
       .update({ has_access: false })
       .eq("user_id", userId);
 
@@ -332,7 +335,8 @@ export async function assignRole(formData: FormData) {
 
     // 2. Guardar el rol específico de Mercure en user_roles
     const { data: existingRole } = await supabaseAdmin
-      .from("mercure_user_roles")
+      .schema("mercure")
+      .from("user_roles")
       .select("id")
       .eq("user_id", targetUserId)
       .limit(1);
@@ -340,7 +344,8 @@ export async function assignRole(formData: FormData) {
     if (existingRole && existingRole.length > 0) {
       // Actualizar rol existente
       const { error } = await supabaseAdmin
-        .from("mercure_user_roles")
+        .schema("mercure")
+        .from("user_roles")
         .update({ role, is_active: true })
         .eq("user_id", targetUserId);
 
@@ -348,7 +353,8 @@ export async function assignRole(formData: FormData) {
     } else {
       // Insertar nuevo rol
       const { error } = await supabaseAdmin
-        .from("mercure_user_roles")
+        .schema("mercure")
+        .from("user_roles")
         .insert({ 
           user_id: targetUserId,
           role,
@@ -406,7 +412,8 @@ export async function removeRole(formData: FormData) {
 
     // 2. Desactivar el rol en user_roles
     const { error } = await supabaseAdmin
-      .from("mercure_user_roles")
+      .schema("mercure")
+      .from("user_roles")
       .update({ is_active: false })
       .eq("user_id", targetUserId);
 
