@@ -134,3 +134,4 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA mercure TO service_role;
 
 
 
+

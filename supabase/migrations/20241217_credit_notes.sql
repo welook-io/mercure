@@ -27,3 +27,4 @@ CREATE INDEX IF NOT EXISTS idx_invoices_voucher_type ON mercure.invoices(voucher
 
 
 
+

@@ -245,3 +245,4 @@ SELECT 'Tarifas especiales cargadas: ' || COUNT(*) as resultado FROM mercure.cli
 
 
 
+

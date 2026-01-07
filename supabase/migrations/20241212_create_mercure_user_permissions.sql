@@ -104,3 +104,4 @@ COMMENT ON COLUMN public.mercure_user_permissions.has_access IS 'Si el usuario t
 
 
 
+

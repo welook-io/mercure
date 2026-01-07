@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
 
   try {
     // Obtener remitos pendientes de facturar
+    // El cliente es el DESTINATARIO (recipient_id), quien recibe y paga
+    // Filtramos por payment_terms = 'cuenta_corriente' y excluimos las ya facturadas
     const { data: remitos, error: remitosError } = await supabaseAdmin
       .schema('mercure')
       .from('shipments')
@@ -26,10 +28,11 @@ export async function GET(request: NextRequest) {
         volume_m3,
         declared_value,
         quotation_id,
-        recipient_id
+        sender_id
       `)
-      .eq('sender_id', parseInt(clienteId))
-      .is('invoice_id', null)
+      .eq('recipient_id', parseInt(clienteId))
+      .eq('payment_terms', 'cuenta_corriente')
+      .neq('status', 'facturada')
       .order('created_at', { ascending: false });
 
     if (remitosError) {
@@ -41,15 +44,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ remitos: [] });
     }
 
-    // Obtener destinatarios
-    const recipientIds = remitos.map(r => r.recipient_id).filter(Boolean) as number[];
-    const { data: recipients } = await supabaseAdmin
+    // Obtener remitentes (quienes enviaron al cliente)
+    const senderIds = remitos.map(r => r.sender_id).filter(Boolean) as number[];
+    const { data: senders } = await supabaseAdmin
       .schema('mercure')
       .from('entities')
       .select('id, legal_name')
-      .in('id', recipientIds);
+      .in('id', senderIds);
 
-    const recipientsMap = new Map(recipients?.map(r => [r.id, r.legal_name]) || []);
+    const sendersMap = new Map(senders?.map(r => [r.id, r.legal_name]) || []);
 
     // Obtener cotizaciones
     const quotationIds = remitos.map(r => r.quotation_id).filter(Boolean) as number[];
@@ -61,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     const quotationsMap = new Map(quotations?.map(q => [q.id, q.total_price]) || []);
 
-    // Armar respuesta
+    // Armar respuesta - mostrar el remitente (quien envió al cliente)
     const result = remitos.map(r => ({
       id: r.id,
       delivery_note_number: r.delivery_note_number,
@@ -69,7 +72,7 @@ export async function GET(request: NextRequest) {
       weight_kg: r.weight_kg,
       volume_m3: r.volume_m3,
       declared_value: r.declared_value,
-      recipient_name: r.recipient_id ? recipientsMap.get(r.recipient_id) : null,
+      recipient_name: r.sender_id ? sendersMap.get(r.sender_id) : null,
       quotation: {
         total_price: r.quotation_id ? quotationsMap.get(r.quotation_id) || 0 : 0
       }
@@ -85,6 +88,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 
 
