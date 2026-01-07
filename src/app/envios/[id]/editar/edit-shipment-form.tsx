@@ -28,6 +28,8 @@ interface ShipmentData {
   quotation_id: string | null;
   remito_image_url: string | null;
   cargo_image_url: string | null;
+  remito_image_urls?: string[] | null;
+  cargo_image_urls?: string[] | null;
   sender?: Entity | null;
   recipient?: Entity | null;
 }
@@ -146,9 +148,15 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
   const [manualSeguro, setManualSeguro] = useState<string>('');
   const [useManualPrice, setUseManualPrice] = useState(false);
   
-  // Estados para imágenes
-  const [remitoImageUrl, setRemitoImageUrl] = useState<string | null>(shipment.remito_image_url);
-  const [cargoImageUrl, setCargoImageUrl] = useState<string | null>(shipment.cargo_image_url);
+  // Estados para imágenes (ahora soporta múltiples)
+  const [remitoImageUrls, setRemitoImageUrls] = useState<string[]>(
+    shipment.remito_image_urls?.length ? shipment.remito_image_urls : 
+    (shipment.remito_image_url ? [shipment.remito_image_url] : [])
+  );
+  const [cargoImageUrls, setCargoImageUrls] = useState<string[]>(
+    shipment.cargo_image_urls?.length ? shipment.cargo_image_urls :
+    (shipment.cargo_image_url ? [shipment.cargo_image_url] : [])
+  );
   const [imageModal, setImageModal] = useState<{ url: string; title: string } | null>(null);
   const remitoInputRef = useRef<HTMLInputElement>(null);
   const cargoInputRef = useRef<HTMLInputElement>(null);
@@ -272,11 +280,11 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
         throw new Error(result.error || 'Error al subir la imagen');
       }
 
-      // Actualizar estado local
+      // Actualizar estado local con el array de imágenes
       if (type === 'remito') {
-        setRemitoImageUrl(result.url);
+        setRemitoImageUrls(result.urls || [...remitoImageUrls, result.url]);
       } else {
-        setCargoImageUrl(result.url);
+        setCargoImageUrls(result.urls || [...cargoImageUrls, result.url]);
       }
 
       setMessage({ type: 'success', text: result.message });
@@ -878,36 +886,51 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
         <div className="p-3 bg-neutral-50 border border-neutral-200 rounded">
           <label className="block text-xs font-medium text-neutral-500 uppercase mb-3">Fotos</label>
           <div className="grid grid-cols-2 gap-4">
-            {/* Foto Remito */}
+            {/* Fotos Remito (múltiples) */}
             <div>
-              <p className="text-xs text-neutral-600 mb-2">Foto del Remito</p>
-              {remitoImageUrl ? (
-                <div className="relative group">
-                  <img 
-                    src={remitoImageUrl} 
-                    alt="Remito" 
-                    className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-90"
-                    onClick={() => setImageModal({ url: remitoImageUrl, title: 'Foto del Remito' })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => remitoInputRef.current?.click()}
-                    className="absolute bottom-2 right-2 h-7 px-2 text-xs bg-white/90 hover:bg-white border rounded flex items-center gap-1"
-                  >
-                    <Upload className="w-3 h-3" /> Cambiar
-                  </button>
-                </div>
-              ) : (
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-neutral-600">Fotos del Remito</p>
+                {remitoImageUrls.length > 0 && (
+                  <span className="text-xs text-neutral-400">{remitoImageUrls.length} foto(s)</span>
+                )}
+              </div>
+              <div className="space-y-2">
+                {/* Mostrar imágenes existentes */}
+                {remitoImageUrls.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {remitoImageUrls.map((url, index) => (
+                      <div key={index} className="relative group">
+                        <img 
+                          src={url} 
+                          alt={`Remito ${index + 1}`} 
+                          className="w-full h-20 object-cover rounded border cursor-pointer hover:opacity-90"
+                          onClick={() => setImageModal({ url, title: `Foto del Remito ${index + 1}` })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newUrls = remitoImageUrls.filter((_, i) => i !== index);
+                            setRemitoImageUrls(newUrls);
+                          }}
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-500/90 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Botón para agregar más */}
                 <button
                   type="button"
                   onClick={() => remitoInputRef.current?.click()}
                   disabled={isUploading}
-                  className="w-full h-32 border-2 border-dashed border-neutral-300 hover:border-orange-400 rounded flex flex-col items-center justify-center gap-2 text-neutral-400 hover:text-orange-500 transition-colors"
+                  className="w-full h-16 border-2 border-dashed border-neutral-300 hover:border-orange-400 rounded flex items-center justify-center gap-2 text-neutral-400 hover:text-orange-500 transition-colors"
                 >
-                  <ImageIcon className="w-8 h-8" />
-                  <span className="text-xs">Subir foto del remito</span>
+                  <Upload className="w-4 h-4" />
+                  <span className="text-xs">{remitoImageUrls.length > 0 ? 'Agregar otra foto' : 'Subir foto del remito'}</span>
                 </button>
-              )}
+              </div>
               <input
                 ref={remitoInputRef}
                 type="file"
@@ -916,40 +939,56 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleImageUpload(file, 'remito');
+                  e.target.value = ''; // Reset para permitir subir el mismo archivo
                 }}
               />
             </div>
 
-            {/* Foto Carga */}
+            {/* Fotos Carga (múltiples) */}
             <div>
-              <p className="text-xs text-neutral-600 mb-2">Foto de la Carga</p>
-              {cargoImageUrl ? (
-                <div className="relative group">
-                  <img 
-                    src={cargoImageUrl} 
-                    alt="Carga" 
-                    className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-90"
-                    onClick={() => setImageModal({ url: cargoImageUrl, title: 'Foto de la Carga' })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => cargoInputRef.current?.click()}
-                    className="absolute bottom-2 right-2 h-7 px-2 text-xs bg-white/90 hover:bg-white border rounded flex items-center gap-1"
-                  >
-                    <Upload className="w-3 h-3" /> Cambiar
-                  </button>
-                </div>
-              ) : (
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-neutral-600">Fotos de la Carga</p>
+                {cargoImageUrls.length > 0 && (
+                  <span className="text-xs text-neutral-400">{cargoImageUrls.length} foto(s)</span>
+                )}
+              </div>
+              <div className="space-y-2">
+                {/* Mostrar imágenes existentes */}
+                {cargoImageUrls.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {cargoImageUrls.map((url, index) => (
+                      <div key={index} className="relative group">
+                        <img 
+                          src={url} 
+                          alt={`Carga ${index + 1}`} 
+                          className="w-full h-20 object-cover rounded border cursor-pointer hover:opacity-90"
+                          onClick={() => setImageModal({ url, title: `Foto de la Carga ${index + 1}` })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newUrls = cargoImageUrls.filter((_, i) => i !== index);
+                            setCargoImageUrls(newUrls);
+                          }}
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-500/90 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Botón para agregar más */}
                 <button
                   type="button"
                   onClick={() => cargoInputRef.current?.click()}
                   disabled={isUploading}
-                  className="w-full h-32 border-2 border-dashed border-neutral-300 hover:border-orange-400 rounded flex flex-col items-center justify-center gap-2 text-neutral-400 hover:text-orange-500 transition-colors"
+                  className="w-full h-16 border-2 border-dashed border-neutral-300 hover:border-orange-400 rounded flex items-center justify-center gap-2 text-neutral-400 hover:text-orange-500 transition-colors"
                 >
-                  <ImageIcon className="w-8 h-8" />
-                  <span className="text-xs">Subir foto de la carga</span>
+                  <Upload className="w-4 h-4" />
+                  <span className="text-xs">{cargoImageUrls.length > 0 ? 'Agregar otra foto' : 'Subir foto de la carga'}</span>
                 </button>
-              )}
+              </div>
               <input
                 ref={cargoInputRef}
                 type="file"
@@ -958,6 +997,7 @@ export function EditShipmentForm({ shipment, entities }: EditShipmentFormProps) 
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleImageUpload(file, 'cargo');
+                  e.target.value = ''; // Reset para permitir subir el mismo archivo
                 }}
               />
             </div>

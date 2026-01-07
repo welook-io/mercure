@@ -7,7 +7,7 @@ import { EditShipmentForm } from "./edit-shipment-form";
 async function getShipmentData(id: number) {
   const { data: shipment } = await supabaseAdmin!
     .schema('mercure').from('shipments')
-    .select('*, quotation_id, remito_image_url, cargo_image_url')
+    .select('*, quotation_id, remito_image_url, cargo_image_url, remito_image_urls, cargo_image_urls')
     .eq('id', id)
     .single();
 

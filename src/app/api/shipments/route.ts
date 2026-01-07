@@ -223,12 +223,31 @@ export async function POST(request: NextRequest) {
       .from('mercure-images')
       .getPublicUrl(filePath);
 
-    // Actualizar en la base de datos
-    const updateField = type === 'remito' ? 'remito_image_url' : 'cargo_image_url';
+    // Obtener imágenes actuales del shipment
+    const { data: currentShipment } = await supabaseAdmin
+      .schema('mercure')
+      .from('shipments')
+      .select('remito_image_urls, cargo_image_urls')
+      .eq('id', parseInt(shipmentId))
+      .single();
+
+    // Preparar el array de imágenes (agregar la nueva al array existente)
+    const arrayField = type === 'remito' ? 'remito_image_urls' : 'cargo_image_urls';
+    const currentUrls = (type === 'remito' 
+      ? currentShipment?.remito_image_urls 
+      : currentShipment?.cargo_image_urls) || [];
+    const updatedUrls = [...currentUrls, publicUrl];
+
+    // También mantener compatibilidad con el campo simple (usar la primera imagen)
+    const simpleField = type === 'remito' ? 'remito_image_url' : 'cargo_image_url';
+    
     const { error: updateError } = await supabaseAdmin
       .schema('mercure')
       .from('shipments')
-      .update({ [updateField]: publicUrl })
+      .update({ 
+        [arrayField]: updatedUrls,
+        [simpleField]: updatedUrls[0] // Mantener la primera imagen en el campo simple
+      })
       .eq('id', parseInt(shipmentId));
 
     if (updateError) {
@@ -239,6 +258,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       url: publicUrl,
+      urls: updatedUrls,
       message: `Foto de ${type === 'remito' ? 'remito' : 'carga'} subida correctamente` 
     });
 
