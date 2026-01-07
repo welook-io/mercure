@@ -254,6 +254,7 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
                   <thead>
                     <tr className="bg-neutral-50 border-b border-neutral-200">
                       <th className="px-3 py-2 w-8"></th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Guía</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remito</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Fecha</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-neutral-500 uppercase">Remitente</th>
@@ -277,8 +278,11 @@ export function ClientDetail({ clientId, clientName, clientTaxId }: ClientDetail
                             {selectedShipments.has(shipment.id) && <Check className="w-3 h-3 text-white" />}
                           </div>
                         </td>
-                        <td className="px-3 py-2 font-mono text-neutral-900">
-                          {shipment.delivery_note_number || `#${shipment.id}`}
+                        <td className="px-3 py-2 font-mono text-orange-600 font-medium">
+                          #{shipment.id}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-neutral-900 text-xs">
+                          {shipment.delivery_note_number || '-'}
                         </td>
                         <td className="px-3 py-2 text-neutral-500 text-xs">
                           {formatDate(shipment.created_at)}

@@ -287,3 +287,10 @@ export function DeliveryList({ enReparto, entregados, totalCobrar }: DeliveryLis
 
 
 
+
+
+
+
+
+
+

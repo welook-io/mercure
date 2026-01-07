@@ -238,3 +238,10 @@ CREATE INDEX IF NOT EXISTS idx_shipments_delivery ON mercure.shipments(delivery_
 SELECT 'Tarifas por tonelaje cargadas: ' || COUNT(*) as resultado FROM mercure.tariff_tonnage_rates;
 SELECT 'Tarifas especiales cargadas: ' || COUNT(*) as resultado FROM mercure.client_special_tariffs WHERE insurance_rate IS NOT NULL;
 
+
+
+
+
+
+
+

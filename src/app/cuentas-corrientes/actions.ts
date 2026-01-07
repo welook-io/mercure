@@ -5,8 +5,9 @@ import { supabaseAdmin } from "@/lib/supabase";
 export async function getClientShipments(entityId: number) {
   if (!supabaseAdmin) throw new Error("No admin client");
   
-  // Obtener envíos pendientes de cobro (entregados pero no facturados)
+  // Obtener envíos pendientes de cobro para cuenta corriente
   // El cliente es el DESTINATARIO (recipient_id), quien recibe y paga
+  // Filtramos por payment_terms = 'cuenta_corriente' y excluimos las ya facturadas
   const { data: shipmentsData } = await supabaseAdmin
     .schema('mercure')
     .from('shipments')
@@ -21,10 +22,12 @@ export async function getClientShipments(entityId: number) {
       sender_id,
       origin,
       destination,
-      pickup_fee
+      pickup_fee,
+      status
     `)
     .eq('recipient_id', entityId)
-    .in('status', ['delivered', 'en_destino', 'arrived', 'rendida', 'entregado'])
+    .eq('payment_terms', 'cuenta_corriente')
+    .neq('status', 'facturada')
     .order('created_at', { ascending: false });
   
   // Obtener nombres de remitentes (quien envió al cliente)

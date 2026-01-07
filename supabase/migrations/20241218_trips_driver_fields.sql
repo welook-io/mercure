@@ -13,3 +13,10 @@ COMMENT ON COLUMN mercure.trips.driver_phone IS 'Teléfono del conductor';
 
 
 
+
+
+
+
+
+
+

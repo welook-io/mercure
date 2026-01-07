@@ -180,3 +180,10 @@ export function ReciboPreview({ receipt }: ReciboPreviewProps) {
 
 
 
+
+
+
+
+
+
+

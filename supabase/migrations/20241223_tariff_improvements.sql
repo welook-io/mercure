@@ -169,3 +169,10 @@ WHERE (origin ILIKE '%Buenos Aires%' OR origin ILIKE '%Rosario%')
   AND destination ILIKE '%Salta%'
   AND price_per_m3 IS NULL;
 
+
+
+
+
+
+
+
